@@ -1,0 +1,366 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Monochrome. Every hue is chroma 0, so nothing drifts warm or cool.
+     Note that --primary is deliberately DARKER than --foreground rather than
+     equal to it: display headings mark their payoff phrase with
+     text-primary, and without that gap the accent would vanish the moment
+     the palette lost its colour. Black is the accent now. */
+  --background: oklch(0.9900 0 0);
+  --foreground: oklch(0.2600 0 0);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.2000 0 0);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.2000 0 0);
+  --primary: oklch(0.1000 0 0);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9600 0 0);
+  --secondary-foreground: oklch(0.2200 0 0);
+  --muted: oklch(0.9600 0 0);
+  --muted-foreground: oklch(0.5300 0 0);
+  --accent: oklch(0.9450 0 0);
+  --accent-foreground: oklch(0.1800 0 0);
+  /* Kept red on purpose — it reports failure rather than carrying brand,
+     and a grey error state is an error state nobody notices. */
+  --destructive: oklch(0.5500 0.2000 27.0000);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.9000 0 0);
+  --input: oklch(0.8500 0 0);
+  --ring: oklch(0.1000 0 0);
+  /* Charts read as a value ramp instead of a hue wheel. */
+  --chart-1: oklch(0.2000 0 0);
+  --chart-2: oklch(0.3600 0 0);
+  --chart-3: oklch(0.5200 0 0);
+  --chart-4: oklch(0.6800 0 0);
+  --chart-5: oklch(0.8200 0 0);
+  --sidebar: oklch(0.9700 0 0);
+  --sidebar-foreground: oklch(0.2600 0 0);
+  --sidebar-primary: oklch(0.1000 0 0);
+  --sidebar-primary-foreground: oklch(1.0000 0 0);
+  --sidebar-accent: oklch(0.9400 0 0);
+  --sidebar-accent-foreground: oklch(0.1800 0 0);
+  --sidebar-border: oklch(0.9000 0 0);
+  --sidebar-ring: oklch(0.1000 0 0);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+}
+
+.dark {
+  /* The light palette inverted: --primary is now BRIGHTER than --foreground,
+     so the accent still outranks body text and filled buttons read as white
+     on near-black. */
+  --background: oklch(0.1450 0 0);
+  --foreground: oklch(0.8800 0 0);
+  --card: oklch(0.1780 0 0);
+  --card-foreground: oklch(0.9400 0 0);
+  --popover: oklch(0.1950 0 0);
+  --popover-foreground: oklch(0.9400 0 0);
+  --primary: oklch(0.9850 0 0);
+  --primary-foreground: oklch(0.1450 0 0);
+  --secondary: oklch(0.2400 0 0);
+  --secondary-foreground: oklch(0.9400 0 0);
+  --muted: oklch(0.2200 0 0);
+  --muted-foreground: oklch(0.6400 0 0);
+  --accent: oklch(0.2600 0 0);
+  --accent-foreground: oklch(0.9600 0 0);
+  --destructive: oklch(0.6000 0.1900 25.0000);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.2750 0 0);
+  --input: oklch(0.3300 0 0);
+  --ring: oklch(0.8500 0 0);
+  --chart-1: oklch(0.9200 0 0);
+  --chart-2: oklch(0.7800 0 0);
+  --chart-3: oklch(0.6200 0 0);
+  --chart-4: oklch(0.4600 0 0);
+  --chart-5: oklch(0.3200 0 0);
+  --sidebar: oklch(0.1650 0 0);
+  --sidebar-foreground: oklch(0.8800 0 0);
+  --sidebar-primary: oklch(0.9850 0 0);
+  --sidebar-primary-foreground: oklch(0.1450 0 0);
+  --sidebar-accent: oklch(0.2300 0 0);
+  --sidebar-accent-foreground: oklch(0.9400 0 0);
+  --sidebar-border: oklch(0.2750 0 0);
+  --sidebar-ring: oklch(0.8500 0 0);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+  --font-display: var(--font-fraunces), var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+  --animate-rippling: rippling var(--duration) ease-out;
+  @keyframes rippling {
+  0% {
+    opacity: 1;
+    }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+}
+
+/* Animations */
+@theme inline {
+  --animate-first: moveVertical 30s ease infinite;
+  --animate-second: moveInCircle 20s reverse infinite;
+  --animate-third: moveInCircle 40s linear infinite;
+  --animate-fourth: moveHorizontal 40s ease infinite;
+  --animate-fifth: moveInCircle 20s ease infinite;
+
+  @keyframes moveHorizontal {
+    0% {
+      transform: translateX(-50%) translateY(-10%);
+    }
+    50% {
+      transform: translateX(50%) translateY(10%);
+    }
+    100% {
+      transform: translateX(-50%) translateY(-10%);
+    }
+  }
+
+  @keyframes moveInCircle {
+    0% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(180deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes moveVertical {
+    0% {
+      transform: translateY(-50%);
+    }
+    50% {
+      transform: translateY(50%);
+    }
+    100% {
+      transform: translateY(-50%);
+    }
+  }
+}
+/* Fraunces axes for every display heading — landing page and pricing alike.
+   font-variation-settings overrides font-weight, so wght has to be stated
+   here rather than via a utility class. opsz is pinned to the display end of
+   the range: at headline sizes that thins the strokes and sharpens the
+   serifs. WONK swaps in the flared alternates that give the face its
+   character. */
+.headline-display {
+  font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1, "wght" 600;
+}
+
+/* Figures and the accented payoff phrase run heavier than the words around
+   them — the thing being promised should carry more weight than the setup. */
+.headline-figure {
+  font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1, "wght" 700;
+}
+
+/* Standfirst under a display heading — the same family as the headline but
+   at text size, so the two read as one setting rather than two typefaces.
+   opsz drops to the text end of the range, which thickens the hairlines and
+   opens the counters so it stays legible small; wght comes back to book. */
+.deck {
+  font-variation-settings: "opsz" 30, "SOFT" 0, "WONK" 1, "wght" 400;
+}
+
+/* Section eyebrows. Only used where the label is a real nav destination. */
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* Credit field dots on the pricing page — lit dots settle in on load. */
+@keyframes creditDotIn {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.credit-dot {
+  animation: creditDotIn 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-dot {
+    animation: none;
+  }
+}
+
+/* Ambient drift for the pricing page's dot canvas. The grid tiles every
+   16px, so travelling exactly one tile loops with no visible seam. */
+@keyframes dotDrift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 16px 16px;
+  }
+}
+
+.dot-drift {
+  animation: dotDrift 8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-drift {
+    animation: none;
+  }
+}
+
+/* Error pages assemble like a build running: one keyframe for every block on
+   the page, sequenced by animation-delay set in the markup. Sharing a single
+   mechanism keeps it an orchestrated run rather than scattered effects. */
+@keyframes buildIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.build-in {
+  animation: buildIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Left blinking after the trace halts — the run stopped, the cursor didn't. */
+@keyframes traceCaret {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.trace-caret {
+  animation: traceCaret 1.1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-in,
+  .trace-caret {
+    animation: none;
+  }
+}
+
+/* Clerk lays plans out in two columns, which strands a third plan alone on
+   a second row. Targets Clerk's stable cl- classnames so the override does
+   not depend on the appearance prop winning specificity. */
+.cl-pricingTable {
+  grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  max-width: none !important;
+}
+
+@media (min-width: 768px) {
+  .cl-pricingTable {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+.cl-pricingTableCard {
+  height: 100% !important;
+}

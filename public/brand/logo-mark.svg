@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Same mark as /logo.svg, but with a large intrinsic size. MetallicPaint
+       rasterises whatever the browser hands it and upscales anything under
+       500px, so the 41px original arrives blurred and the alpha mask — which
+       is what the shader cuts the metal to — loses its edges. -->
+  <path d="M20 0C8.9543 0 0 8.9543 0 20C11.0457 20 20 11.0457 20 0Z" fill="#8a8a8a"/>
+  <path d="M20 40C31.0457 40 40 31.0457 40 20C28.9543 20 20 28.9543 20 40Z" fill="#8a8a8a"/>
+  <path d="M20 0C31.0457 0 40 8.9543 40 20C28.9543 20 20 11.0457 20 0Z" fill="#141414"/>
+  <path d="M20 40C8.9543 40 0 31.0457 0 20C11.0457 20 20 28.9543 20 40Z" fill="#141414"/>
+</svg>

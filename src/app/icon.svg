@@ -1,0 +1,26 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Baked chrome. MetallicPaint's shader can't run in a favicon, so the
+       gradient stands in for it: sky highlight, a hard horizon at the middle,
+       then bounce light. Banding is coarse on purpose — a subtle ramp turns
+       to mud at 16px. The dark tile is what gives the metal something to read
+       against; on white the highlights disappear into the background. -->
+  <defs>
+    <linearGradient id="chrome" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="16%" stop-color="#dcdfe3"/>
+      <stop offset="38%" stop-color="#828892"/>
+      <stop offset="49%" stop-color="#43484f"/>
+      <stop offset="51%" stop-color="#666c74"/>
+      <stop offset="66%" stop-color="#b4bac1"/>
+      <stop offset="84%" stop-color="#f6f8fa"/>
+      <stop offset="100%" stop-color="#969ca3"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="#0f0f0f"/>
+  <g transform="translate(7 7) scale(1.25)">
+    <path d="M20 0C8.9543 0 0 8.9543 0 20C11.0457 20 20 11.0457 20 0Z" fill="url(#chrome)"/>
+    <path d="M20 40C31.0457 40 40 31.0457 40 20C28.9543 20 20 28.9543 20 40Z" fill="url(#chrome)"/>
+    <path d="M20 0C31.0457 0 40 8.9543 40 20C28.9543 20 20 11.0457 20 0Z" fill="url(#chrome)"/>
+    <path d="M20 40C8.9543 40 0 31.0457 0 20C11.0457 20 20 28.9543 20 40Z" fill="url(#chrome)"/>
+  </g>
+</svg>
