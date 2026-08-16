@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 
 import { WorkspaceShell } from "@/components/workspace-shell";
-import { DashboardView } from "@/modules/dashboard/ui/views/dashboard-view";
 import { requireOnboarding } from "@/modules/onboarding/server/guard";
+import { SupportView } from "@/modules/support/ui/views/support-view";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Support",
   robots: { index: false, follow: false },
 };
 
 const Page = async () => {
-  // Signed-in surface, so the same gate as the rest of the workspace.
   await requireOnboarding();
 
   return (
-    <WorkspaceShell page="Dashboard">
-      <DashboardView />
+    <WorkspaceShell page="Support">
+      <SupportView />
     </WorkspaceShell>
   );
 };

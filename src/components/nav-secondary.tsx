@@ -25,10 +25,16 @@ export function NavSecondary({
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild size="sm">
+              {/* Quieter than the primary nav on purpose — support links are
+                  a destination you look for, not one you navigate by. */}
+              <SidebarMenuButton
+                asChild
+                size="sm"
+                className="group/sub text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 h-8 gap-3 rounded-lg px-2 transition-colors"
+              >
                 <a href={item.url}>
-                  <item.icon />
-                  <span>{item.title}</span>
+                  <item.icon className="size-4 shrink-0" />
+                  <span className="truncate">{item.title}</span>
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>

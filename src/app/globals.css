@@ -320,6 +320,36 @@
   }
 }
 
+/* Hustle card covers. The cover is a CSS miniature of a web page; the only
+   ambient motion is this sheen crossing the glass. Transform-only, so a grid
+   of them composites on the GPU and never touches the main thread. */
+@keyframes coverSheen {
+  0% {
+    transform: translateX(0) skewX(-14deg);
+  }
+  /* Long tail: the sweep takes a fifth of the cycle and the rest is stillness,
+     which is what keeps it reading as a glint rather than a loading bar. */
+  22%,
+  100% {
+    transform: translateX(320%) skewX(-14deg);
+  }
+}
+
+.cover-sheen {
+  animation: coverSheen 9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-sheen {
+    animation: none;
+    opacity: 0;
+  }
+
+  .group:hover [class*="group-hover:-translate-y"] {
+    transform: none;
+  }
+}
+
 .dot-drift {
   animation: dotDrift 8s linear infinite;
 }

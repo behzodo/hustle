@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
 
-export function SiteHeader() {
+export function SiteHeader({ page = "Dashboard" }: { page?: string }) {
   const { toggleSidebar } = useSidebar()
   const { user } = useUser()
 
@@ -60,7 +60,7 @@ export function SiteHeader() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>Dashboard</BreadcrumbPage>
+              <BreadcrumbPage>{page}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
