@@ -1,20 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowUpRightIcon } from "@phosphor-icons/react";
 
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
 
 /** The caller's newest projects — the one panel here reading live data. */
 export const RecentHustles = () => {
-  const trpc = useTRPC();
-  const { data: projects, isPending } = useQuery(
-    trpc.projects.getMany.queryOptions(),
-  );
+  // undefined while the subscription is still opening.
+  const projects = useQuery(api.projects.list, {});
 
-  if (isPending) {
+  if (projects === undefined) {
     return (
       <div className="space-y-2">
         {[0, 1, 2, 3].map((i) => (
@@ -41,9 +39,9 @@ export const RecentHustles = () => {
   return (
     <ul className="divide-y">
       {projects.slice(0, 5).map((project) => (
-        <li key={project.id}>
+        <li key={project._id}>
           <Link
-            href={`/projects/${project.id}`}
+            href={`/projects/${project._id}`}
             className="group flex items-center gap-3 py-3 first:pt-0"
           >
             <div className="min-w-0 flex-1">

@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { formatDistanceToNow } from "date-fns";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 
 import { HustleCover } from "../components/hustle-cover";
@@ -71,10 +71,7 @@ const CardSkeleton = () => (
 );
 
 export const HustlesView = () => {
-  const trpc = useTRPC();
-  const { data: projects, isPending } = useQuery(
-    trpc.projects.getMany.queryOptions(),
-  );
+  const projects = useQuery(api.projects.list, {});
 
   return (
     <div className="flex w-full flex-col gap-8 p-4 md:p-6">
@@ -102,12 +99,13 @@ export const HustlesView = () => {
       <div className="grid gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
         <NewHustleCard />
 
-        {isPending && [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
+        {projects === undefined &&
+          [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
 
         {projects?.map((project) => (
           <HustleCard
-            key={project.id}
-            id={project.id}
+            key={project._id}
+            id={project._id}
             name={project.name}
             updatedAt={new Date(project.updatedAt)}
           />

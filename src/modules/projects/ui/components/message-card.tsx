@@ -4,7 +4,12 @@ import { ChevronRightIcon, Code2Icon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
-import { Fragment, MessageRole, MessageType } from "@/generated/prisma";
+import type { Fragment } from "@/modules/projects/types";
+
+// The enums were Prisma's; the Convex schema states them as literal unions,
+// and these mirror it.
+type MessageRole = "USER" | "ASSISTANT";
+type MessageType = "RESULT" | "ERROR";
 
 interface UserMessageProps {
   content: string;
@@ -57,7 +62,8 @@ const FragmentCard = ({
 interface AssistantMessageProps {
   content: string;
   fragment: Fragment | null;
-  createdAt: Date;
+  /** Convex's _creationTime, epoch millis rather than a Date. */
+  createdAt: number;
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
@@ -107,7 +113,8 @@ interface MessageCardProps {
   content: string;
   role: MessageRole;
   fragment: Fragment | null;
-  createdAt: Date;
+  /** Convex's _creationTime, epoch millis rather than a Date. */
+  createdAt: number;
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;

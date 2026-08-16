@@ -8,10 +8,13 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { generateSlug } from "random-word-slugs";
+import { ConvexError } from "convex/values";
+import { useMutation } from "convex/react";
 
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
+import { startAgentRun } from "@/modules/projects/start-run";
 import { Form, FormField } from "@/components/ui/form";
 import { SendButton } from "@/components/send-button";
 import { BorderBeam } from "@/components/ui/border-beam";
@@ -27,10 +30,10 @@ const formSchema = z.object({
 
 export const ProjectForm = () => {
   const router = useRouter();
-  const trpc = useTRPC();
   const clerk = useClerk();
   const appearance = useClerkAppearance();
-  const queryClient = useQueryClient();
+  const createProject = useMutation(api.projects.create);
+  const [isPending, setIsPending] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -38,33 +41,38 @@ export const ProjectForm = () => {
     },
   });
   
-  const createProject = useMutation(trpc.projects.create.mutationOptions({
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(
-        trpc.projects.getMany.queryOptions(),
-      );
-      queryClient.invalidateQueries(
-        trpc.usage.status.queryOptions(),
-      );
-      router.push(`/projects/${data.id}`);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-      
-      if (error.data?.code === "UNAUTHORIZED") {
-        clerk.openSignIn({ appearance });
-      }
-
-      if (error.data?.code === "TOO_MANY_REQUESTS") {
-        router.push("/pricing");
-      }
-    },
-  }));
-  
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await createProject.mutateAsync({
-      value: values.value,
-    });
+    setIsPending(true);
+
+    try {
+      // The project name was generated server-side under tRPC; a Convex
+      // mutation has to stay deterministic, so the slug is minted here and
+      // passed in.
+      const projectId = await createProject({
+        name: generateSlug(2, { format: "kebab" }),
+        value: values.value,
+      });
+
+      // Mutations cannot make network calls, so the run is dispatched after
+      // the write lands rather than inside it.
+      await startAgentRun({ projectId, value: values.value });
+
+      router.push(`/projects/${projectId}`);
+    } catch (error) {
+      const data = error instanceof ConvexError ? error.data : null;
+      const code = (data as { code?: string } | null)?.code;
+
+      if (code === "OUT_OF_CREDITS") {
+        toast.error("You have run out of credits");
+        router.push("/pricing");
+      } else if (code === "UNAUTHENTICATED") {
+        clerk.openSignIn({ appearance });
+      } else {
+        toast.error("Could not start that build");
+      }
+    } finally {
+      setIsPending(false);
+    }
   };
 
   const onSelect = (value: string) => {
@@ -76,8 +84,7 @@ export const ProjectForm = () => {
   };
   
   const [isFocused, setIsFocused] = useState(false);
-  const isPending = createProject.isPending;
-  const isButtonDisabled = isPending || !form.formState.isValid;
+    const isButtonDisabled = isPending || !form.formState.isValid;
 
   return (
     <Form {...form}>

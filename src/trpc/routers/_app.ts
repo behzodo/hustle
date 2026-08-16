@@ -1,13 +1,9 @@
-import { usageRouter } from '@/modules/usage/server/procedures';
-import { messagesRouter } from '@/modules/messages/server/procedures';
-import { projectsRouter } from '@/modules/projects/server/procedures';
-
 import { createTRPCRouter } from '../init';
 
-export const appRouter = createTRPCRouter({
-  usage: usageRouter,
-  messages: messagesRouter,
-  projects: projectsRouter,
-});
+// Projects, messages and credits now live in Convex — see convex/projects.ts,
+// convex/messages.ts and convex/credits.ts. The router is kept as the mount
+// point for anything that genuinely needs a Next.js server procedure later;
+// nothing does today.
+export const appRouter = createTRPCRouter({});
 // export type definition of API
 export type AppRouter = typeof appRouter;

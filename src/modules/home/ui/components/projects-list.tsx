@@ -4,15 +4,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import { formatDistanceToNow } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 
 export const ProjectsList = () => {
-  const trpc = useTRPC();
   const { user } = useUser();
-  const { data: projects } = useQuery(trpc.projects.getMany.queryOptions());
+  const projects = useQuery(api.projects.list, {});
 
   if (!user) return null;
 
@@ -31,12 +30,12 @@ export const ProjectsList = () => {
         )}
         {projects?.map((project) => (
           <Button
-            key={project.id}
+            key={project._id}
             variant="outline"
             className="font-normal h-auto justify-start w-full text-start p-4"
             asChild
           >
-            <Link href={`/projects/${project.id}`}>
+            <Link href={`/projects/${project._id}`}>
               <div className="flex items-center gap-x-4">
                 <Image
                   src="/logo.svg"

@@ -6,17 +6,21 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
 import { ArrowUpIcon, Loader2Icon } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ConvexError } from "convex/values";
+import { useMutation, useQuery } from "convex/react";
 
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
+import type { ProjectId } from "@/modules/projects/types";
 import { Button } from "@/components/ui/button";
 import { Form, FormField } from "@/components/ui/form";
+
+import { startAgentRun } from "@/modules/projects/start-run";
 
 import { Usage } from "./usage";
 
 interface Props {
-  projectId: string;
+  projectId: ProjectId;
 };
 
 const formSchema = z.object({
@@ -26,11 +30,13 @@ const formSchema = z.object({
 })
 
 export const MessageForm = ({ projectId }: Props) => {
-  const trpc = useTRPC();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
-  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+  // Reactive, so spending a credit updates the counter in every open tab.
+  // The tRPC version needed an explicit invalidate after each send.
+  const usage = useQuery(api.credits.status);
+  const sendMessage = useMutation(api.messages.send);
+  const [isPending, setIsPending] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,43 +45,43 @@ export const MessageForm = ({ projectId }: Props) => {
     },
   });
   
-  const createMessage = useMutation(trpc.messages.create.mutationOptions({
-    onSuccess: () => {
-      form.reset();
-      queryClient.invalidateQueries(
-        trpc.messages.getMany.queryOptions({ projectId }),
-      );
-      queryClient.invalidateQueries(
-        trpc.usage.status.queryOptions()
-      );
-    },
-    onError: (error) => {
-      toast.error(error.message);
-
-      if (error.data?.code === "TOO_MANY_REQUESTS") {
-        router.push("/pricing");
-      }
-    },
-  }));
-  
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await createMessage.mutateAsync({
-      value: values.value,
-      projectId,
-    });
+    setIsPending(true);
+
+    try {
+      await sendMessage({ projectId, value: values.value });
+      form.reset();
+
+      // The message list is a live query, so there is nothing to invalidate —
+      // the new row arrives on its own.
+      await startAgentRun({ projectId, value: values.value });
+    } catch (error) {
+      // Credits throw a ConvexError carrying a code; anything else is a
+      // genuine failure and should not send someone to the pricing page.
+      const data = error instanceof ConvexError ? error.data : null;
+      const code = (data as { code?: string } | null)?.code;
+
+      if (code === "OUT_OF_CREDITS") {
+        toast.error("You have run out of credits");
+        router.push("/pricing");
+      } else {
+        toast.error("Could not send that message");
+      }
+    } finally {
+      setIsPending(false);
+    }
   };
-  
+
   const [isFocused, setIsFocused] = useState(false);
-  const isPending = createMessage.isPending;
   const isButtonDisabled = isPending || !form.formState.isValid;
-  const showUsage = !!usage;
+  const showUsage = Boolean(usage);
 
   return (
     <Form {...form}>
       {showUsage && (
         <Usage
-          points={usage.remainingPoints}
-          msBeforeNext={usage.msBeforeNext}
+          points={usage!.remainingPoints}
+          msBeforeNext={usage!.msBeforeNext}
         />
       )}
       <form

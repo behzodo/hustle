@@ -1,11 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { ErrorBoundary } from "react-error-boundary";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
 import { appUrl } from "@/lib/site";
-import { getQueryClient, trpc } from "@/trpc/server";
 import { requireOnboarding } from "@/modules/onboarding/server/guard";
+import type { ProjectId } from "@/modules/projects/types";
 
 import { ErrorState } from "@/components/error-state";
 import { ProjectView } from "@/modules/projects/ui/views/project-view";
@@ -28,16 +27,10 @@ const Page = async ({ params }: Props) => {
 
   const { projectId } = await params;
 
-  const queryClient = getQueryClient();
-  void queryClient.prefetchQuery(trpc.messages.getMany.queryOptions({
-    projectId,
-  }));
-  void queryClient.prefetchQuery(trpc.projects.getOne.queryOptions({
-    id: projectId,
-  }));
-
-  return ( 
-    <HydrationBoundary state={dehydrate(queryClient)}>
+  // No prefetch: the project and its messages are live Convex queries now,
+  // and they subscribe from the client rather than being hydrated in.
+  return (
+    <>
       {/* This boundary sits below the route's error.tsx, so without a real
           fallback here a failed project would never reach it. */}
       <ErrorBoundary
@@ -58,10 +51,10 @@ const Page = async ({ params }: Props) => {
         }
       >
         <Suspense fallback={<p>Loading Project...</p>}>
-          <ProjectView projectId={projectId} />
+          <ProjectView projectId={projectId as ProjectId} />
         </Suspense>
       </ErrorBoundary>
-    </HydrationBoundary>
+    </>
   );
 };
  
