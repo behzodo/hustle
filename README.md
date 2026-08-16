@@ -1,143 +1,152 @@
+<div align="center">
+
 # Hustle
 
-AI-powered development platform that lets you create web applications by chatting with AI agents in real-time sandboxes.
+**Find the business. Build their site. Then pitch.**
 
-## Features
+Hustle is for freelancers who sell websites to local businesses. Describe a
+business, and an AI agent builds them a real Next.js site in a live sandbox —
+so you turn up with the work already done.
 
-- 🤖 AI-powered code generation with AI agents
-- 💻 Real-time Next.js application development in E2B sandboxes
-- 🔄 Live preview & code preview with split-pane interface
-- 📁 File explorer with syntax highlighting and code theme
-- 💬 Conversational project development with message history
-- 🎯 Smart usage tracking and rate limiting
-- 💳 Subscription management with pro features
-- 🔐 Authentication with Clerk
-- ⚙️ Background job processing with Inngest
-- 🗃️ Project management and persistence
+[![CI](https://github.com/behzodo/hustle/actions/workflows/ci.yml/badge.svg)](https://github.com/behzodo/hustle/actions/workflows/ci.yml)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000?logo=next.js)](https://nextjs.org)
+[![Convex](https://img.shields.io/badge/Convex-reactive%20db-EE342F)](https://convex.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-## Tech Stack
-
-- Next.js 15
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- Shadcn/ui
-- tRPC
-- Prisma ORM
-- PostgreSQL
-- OpenAI, Anthropic or Grok
-- E2B Code Interpreter
-- Clerk Authentication
-- Inngest
-- Prisma
-- Radix UI
-- Lucide React
-
-## Building E2B Template (REQUIRED)
-
-Before running the application, you must build the E2B template that the AI agents use to create sandboxes.
-
-**Prerequisites:**
-- Docker must be installed and running (the template build command uses Docker CLI)
-
-```bash
-# Install E2B CLI
-npm i -g @e2b/cli
-# or
-brew install e2b
-
-# Login to E2B
-e2b auth login
-
-# Navigate to the sandbox template directory
-cd sandbox-templates/nextjs
-
-# Build the template (replace 'your-template-name' with your desired name)
-e2b template build --name your-template-name --cmd "/compile_page.sh"
-```
-
-After building the template, update the template name in `src/inngest/functions.ts`:
-
-```typescript
-// Replace "vibe-nextjs-test-2" with your template name
-const sandbox = await Sandbox.create("your-template-name");
-```
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp env.example .env
-# Fill in your API keys and database URL
-
-# Set up database
-npx prisma migrate dev # Enter name "init" for migration
-
-# Start development server
-npm run dev
-```
-
-## Environment Variables
-
-Create a `.env` file with the following variables:
-
-```bash
-DATABASE_URL=""
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-
-# OpenAI
-OPENAI_API_KEY=""
-
-# E2B
-E2B_API_KEY=""
-
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
-CLERK_SECRET_KEY=""
-NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in"
-NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
-NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL="/"
-NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL="/"
-```
-
-## Additional Commands
-
-```bash
-# Database
-npm run postinstall        # Generate Prisma client
-npx prisma studio          # Open database studio
-npx prisma migrate dev     # Migrate schema changes
-npx prisma migrate reset   # Reset database (Only for development)
-
-# Build
-npm run build          # Build for production
-npm run start          # Start production server
-npm run lint           # Run ESLint
-```
-
-## Project Structure
-
-- `src/app/` - Next.js app router pages and layouts
-- `src/components/` - Reusable UI components and file explorer
-- `src/modules/` - Feature-specific modules (projects, messages, usage)
-- `src/inngest/` - Background job functions and AI agent logic
-- `src/lib/` - Utilities and database client
-- `src/trpc/` - tRPC router and client setup
-- `prisma/` - Database schema and migrations
-- `sandbox-templates/` - E2B sandbox configuration
-
-## How It Works
-
-1. **Project Creation**: Users create projects and describe what they want to build
-2. **AI Processing**: Messages are sent to GPT-4 agents via Inngest background jobs
-3. **Code Generation**: AI agents use E2B sandboxes to generate and test Next.js applications
-4. **Real-time Updates**: Generated code and previews are displayed in split-pane interface
-5. **File Management**: Users can browse generated files with syntax highlighting
-6. **Iteration**: Conversational development allows for refinements and additions
+</div>
 
 ---
 
-Created by [CodeWithAntonio](https://codewithantonio.com)
+## How it works
+
+```
+ you type                agent runs                  you pitch
+┌──────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│ "a dentist   │─────▶│ E2B sandbox      │─────▶│ live URL + files │
+│  in Leeds"   │      │ writes Next.js   │      │ ready to send    │
+└──────────────┘      └──────────────────┘      └──────────────────┘
+   1 credit            Inngest orchestrates        Gmail · Stripe
+```
+
+1. **Describe a business.** One prompt is all the agent needs.
+2. **The agent builds.** An [E2B](https://e2b.dev) sandbox boots, the agent
+   writes and runs real files, and you get a live URL plus every file it wrote.
+3. **Pitch it.** Send the finished site from your own Gmail; invoice through
+   Stripe Connect when they say yes.
+
+## Two hosts, one codebase
+
+| | |
+|---|---|
+| `hustle.com` | Marketing landing |
+| `app.hustle.com` | The workspace |
+
+[`src/middleware.ts`](src/middleware.ts) rewrites `app.<domain>/x` to the
+routes under `src/app/app/`, so links stay clean and auth runs against the
+resolved path.
+
+## The workspace
+
+| Section | What it does |
+|---|---|
+| **Dashboard** | Sites built, credits left, pipeline and funnel charts |
+| **Your hustles** | Every build, each with a CSS miniature of its page |
+| **Connections** | Gmail via Nango, Stripe Connect for invoicing |
+| **Support** | In-app AI assistant on Groq, plus a floating widget |
+| **Feedback** | Goes straight to a Convex table |
+
+## Stack
+
+**Next.js 15** · React 19 · TypeScript · Tailwind v4 · shadcn/ui
+**Convex** — reactive database. The chat updates by subscription, not polling
+**Inngest** — orchestrates agent runs that outlive any serverless timeout
+**E2B** — the sandbox each site is built and served from
+**Clerk** — auth and billing · **Groq** — the support assistant
+**Nango** — Gmail OAuth · **Stripe Connect** — invoicing and payouts
+
+### Why the split between Inngest and Convex
+
+A build drives a sandbox for up to 30 minutes; a Convex action is capped at
+10. So Inngest keeps orchestrating and calls back through the HTTP actions in
+[`convex/http.ts`](convex/http.ts) to persist what it produced. Those routes
+hold a shared secret, because the mutations behind them write assistant
+messages into any project and must never be publicly callable.
+
+## Running it
+
+### 1. Build the E2B template (required)
+
+Docker must be running.
+
+```bash
+npm i -g @e2b/cli
+e2b auth login
+
+cd sandbox-templates/nextjs
+e2b template build --name your-template-name --cmd "/compile_page.sh"
+```
+
+Then set the name in [`src/inngest/functions.ts`](src/inngest/functions.ts).
+
+### 2. Start
+
+```bash
+npm install
+npx convex dev          # keep running: pushes functions, serves the database
+npm run dev             # http://localhost:3000
+npx inngest-cli@latest dev   # agent runs
+```
+
+The workspace is on the app subdomain: **http://app.localhost:3000**.
+
+### 3. Environment
+
+```bash
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_ORIGIN="http://app.localhost:3000"
+
+# Convex — written by `npx convex dev`
+NEXT_PUBLIC_CONVEX_URL=
+NEXT_PUBLIC_CONVEX_SITE_URL=
+
+# Clerk. Needs a JWT template named "convex" with a `features` claim,
+# or every account falls back to the free credit allowance.
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+
+OPENAI_API_KEY=          # the code agent
+GROQ_API_KEY=            # the support assistant
+E2B_API_KEY=
+
+# Same value on both sides:
+#   npx convex env set AGENT_WEBHOOK_SECRET "<random>"
+AGENT_WEBHOOK_SECRET=
+
+NANGO_SECRET_KEY=        # optional, Gmail
+STRIPE_SECRET_KEY=       # optional, invoicing
+```
+
+## Layout
+
+```
+convex/          schema, queries, mutations, HTTP actions
+src/app/         routes — marketing at the root, workspace under /app
+src/modules/     features: projects, hustles, dashboard, connections, support
+src/inngest/     the agent run and its callbacks into Convex
+src/components/  shared UI
+sandbox-templates/  the E2B image builds run in
+```
+
+## Where it stands
+
+Building, storing and previewing sites works end to end. Finding businesses
+automatically, storing leads, and real revenue reporting do not exist yet —
+the dashboard panels that show them are marked **sample** in the UI, and the
+support assistant is told to say so.
+
+See the [board](https://github.com/behzodo/hustle/projects) for what is next.
+
+---
+
+Built on the vibe-coding platform by
+[CodeWithAntonio](https://codewithantonio.com), rebuilt into Hustle.

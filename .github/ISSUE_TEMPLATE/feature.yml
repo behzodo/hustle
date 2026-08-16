@@ -1,0 +1,29 @@
+name: Feature
+description: Something Hustle should do that it does not
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The job, not the solution. "I want to stop retyping the pitch" beats "add a template field".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How might it work?
+      description: Optional. A rough shape is fine.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Building sites
+        - Finding leads
+        - Outreach
+        - Invoicing and payouts
+        - Dashboard
+        - Something else
+    validations:
+      required: true

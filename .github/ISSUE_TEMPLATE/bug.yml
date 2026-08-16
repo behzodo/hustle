@@ -1,0 +1,21 @@
+name: Bug
+description: Something is broken
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where?
+      placeholder: app.hustle.com/dashboard
+  - type: textarea
+    id: console
+    attributes:
+      label: Anything in the console?
+      render: shell
