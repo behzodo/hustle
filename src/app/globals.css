@@ -56,6 +56,14 @@
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-900);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-900);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-900);
+  --invert: var(--color-zinc-900);
+  --invert-foreground: var(--color-zinc-50);
 }
 
 .dark {
@@ -106,6 +114,14 @@
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-600);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-600);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-600);
+  --invert: var(--color-zinc-700);
+  --invert-foreground: var(--color-zinc-50);
 }
 
 @theme inline {
@@ -161,6 +177,14 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
   --animate-rippling: rippling var(--duration) ease-out;
+  --color-invert-foreground: var(--invert-foreground);
+  --color-invert: var(--invert);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-info-foreground: var(--info-foreground);
+  --color-info: var(--info);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
   @keyframes rippling {
   0% {
     opacity: 1;
@@ -293,6 +317,36 @@
   }
   to {
     background-position: 16px 16px;
+  }
+}
+
+/* Hustle card covers. The cover is a CSS miniature of a web page; the only
+   ambient motion is this sheen crossing the glass. Transform-only, so a grid
+   of them composites on the GPU and never touches the main thread. */
+@keyframes coverSheen {
+  0% {
+    transform: translateX(0) skewX(-14deg);
+  }
+  /* Long tail: the sweep takes a fifth of the cycle and the rest is stillness,
+     which is what keeps it reading as a glint rather than a loading bar. */
+  22%,
+  100% {
+    transform: translateX(320%) skewX(-14deg);
+  }
+}
+
+.cover-sheen {
+  animation: coverSheen 9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-sheen {
+    animation: none;
+    opacity: 0;
+  }
+
+  .group:hover [class*="group-hover:-translate-y"] {
+    transform: none;
   }
 }
 

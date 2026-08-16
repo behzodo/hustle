@@ -78,4 +78,20 @@ export default defineSchema({
     // Stripe connected account id, once they finish Connect onboarding.
     stripeAccountId: v.optional(v.string()),
   }).index("by_user", ["userId"]),
+
+  feedback: defineTable({
+    userId: v.string(),
+    // What kind of note this is, so the inbox can be triaged without reading
+    // every line.
+    kind: v.union(
+      v.literal("idea"),
+      v.literal("bug"),
+      v.literal("praise"),
+      v.literal("other"),
+    ),
+    message: v.string(),
+    // Captured at submit time. Clerk owns the address and it can change, but
+    // a reply needs to go somewhere even if the account is later deleted.
+    email: v.optional(v.string()),
+  }).index("by_user", ["userId"]),
 });
