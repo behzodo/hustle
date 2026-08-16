@@ -62,16 +62,9 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="pt-2 pr-1">
-          {/* A project created through the new-hustle wizard arrives here with
-              no messages at all. Without this the pane is blank and the
-              composer below reads as a chat that failed to load. */}
-          {messages.length === 0 && (
-            <div className="text-muted-foreground px-4 py-10 text-center text-sm text-balance">
-              Nothing built yet. Describe the business below and the agent gets
-              to work.
-            </div>
-          )}
-
+          {/* No empty state here: a project with no messages never reaches
+              this pane, because ProjectView opens it on the blank canvas
+              instead of the split. */}
           {messages.map((message) => (
             <MessageCard
               key={message._id}

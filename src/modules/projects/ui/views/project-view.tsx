@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "convex/react";
 import { useAuth } from "@clerk/nextjs";
 import { Suspense, useState } from "react";
 import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
 
+import { api } from "@/../convex/_generated/api";
 import type { Fragment, ProjectId } from "@/modules/projects/types";
 import { isPaidPlan } from "@/lib/entitlements";
 import { Button } from "@/components/ui/button";
@@ -17,8 +19,10 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 
+import { BlankCanvas } from "../components/blank-canvas";
 import { FragmentWeb } from "../components/fragment-web";
 import { ProjectHeader } from "../components/project-header";
+import { EmptyWorkspace } from "../components/empty-workspace";
 import { MessagesContainer } from "../components/messages-container";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -32,6 +36,17 @@ export const ProjectView = ({ projectId }: Props) => {
 
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
+
+  // Same query and args MessagesContainer subscribes to, so this is the same
+  // subscription rather than a second one — Convex hands both callers the one
+  // cached result.
+  const messages = useQuery(api.messages.list, { projectId });
+
+  // undefined is still loading. Committing to a layout before the count is
+  // known would flash the split panes on a brand-new hustle.
+  if (messages === undefined) return null;
+
+  if (messages.length === 0) return <BlankCanvas projectId={projectId} />;
 
   return (
     <div className="h-screen">
@@ -87,14 +102,23 @@ export const ProjectView = ({ projectId }: Props) => {
                 <UserControl />
               </div>
             </div>
-            <TabsContent value="preview">
-              {!!activeFragment && <FragmentWeb data={activeFragment} />}
+            {/* Both panes fall back to the empty workspace rather than
+                rendering nothing: a draft from the wizard has no fragment at
+                all, and two thirds of a blank screen reads as a failure. */}
+            <TabsContent value="preview" className="min-h-0 flex-1">
+              {activeFragment ? (
+                <FragmentWeb data={activeFragment} />
+              ) : (
+                <EmptyWorkspace pane="preview" />
+              )}
             </TabsContent>
-            <TabsContent value="code" className="min-h-0">
-              {!!activeFragment?.files && (
+            <TabsContent value="code" className="min-h-0 flex-1">
+              {activeFragment?.files ? (
                 <FileExplorer
                   files={activeFragment.files as { [path: string]: string }}
                 />
+              ) : (
+                <EmptyWorkspace pane="code" />
               )}
             </TabsContent>
           </Tabs>
