@@ -16,7 +16,7 @@ export default function ContentSection() {
                     </div>
                     <div className="space-y-4">
                         <p className="text-muted-foreground text-balance text-lg">Cold outreach fails because you are asking for imagination. A plumber cannot picture the website you are describing over the phone.</p>
-                        <p className="text-muted-foreground text-balance text-lg">So Hustle builds it first. You send a link to a finished site with their name on it, and the conversation starts at "how much" instead of "no thanks".</p>
+                        <p className="text-muted-foreground text-balance text-lg">So Hustle builds it first. You send a link to a finished site with their name on it, and the conversation starts at &ldquo;how much&rdquo; instead of &ldquo;no thanks&rdquo;.</p>
 
                         <div className="*:not-last:pb-3 *:not-last:border-b mt-20 flex flex-col gap-3 pt-6">
                             <p className="text-muted-foreground text-balance text-lg">

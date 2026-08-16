@@ -12,7 +12,15 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: ["**/generated/*"]
+    // Vendored from component registries (shadcn blocks, evilcharts, reui) and
+    // patched only where this project's Radix components differ. Holding them
+    // to our lint rules means re-fixing style on every registry update, for
+    // code we did not write.
+    ignores: [
+      "**/generated/*",
+      "src/components/evilcharts/**",
+      "src/components/reui/**",
+    ],
   },
 ];
 

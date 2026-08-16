@@ -82,6 +82,10 @@ const GlobalError = ({ error, reset }: Props) => {
               >
                 Reload
               </button>
+              {/* A plain anchor on purpose: global-error replaces the root
+                  layout, so the router this sits above has already failed.
+                  next/link would try to soft-navigate with it. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/"
                 className="inline-flex h-9 items-center rounded-md border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

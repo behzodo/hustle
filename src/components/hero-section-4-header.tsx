@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
-import { Menu, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { SignInCta, SignUpCta } from '@/components/auth-cta'
 import React from 'react'
 
