@@ -30,7 +30,9 @@ const PanelHead = ({
   sample?: boolean;
   action?: React.ReactNode;
 }) => (
-  <div className="flex items-start justify-between gap-3 border-b p-5">
+  // px-5 py-4 rather than a flat p-5: the head is a label strip, and the
+  // square padding gave it the presence of a section of its own.
+  <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
     <div className="min-w-0">
       <div className="flex items-center gap-2">
         <h2 className="font-display headline-display text-lg tracking-[-0.02em]">
@@ -38,9 +40,7 @@ const PanelHead = ({
         </h2>
         {sample && <SampleBadge />}
       </div>
-      {hint && (
-        <p className="text-muted-foreground mt-1 text-sm">{hint}</p>
-      )}
+      {hint && <p className="text-muted-foreground mt-0.5 text-sm">{hint}</p>}
     </div>
     {action}
   </div>
@@ -48,8 +48,9 @@ const PanelHead = ({
 
 export const DashboardView = () => (
   <div className="flex w-full flex-col gap-4 p-4 md:p-6">
-    {/* Page head */}
-    <div className="flex flex-wrap items-end justify-between gap-4">
+    {/* Page head. items-center, not items-end: against a three-line text
+        block the button was landing level with nothing, reading as adrift. */}
+    <div className="flex flex-wrap items-center justify-between gap-4">
       <div>
         <PanelLabel>Overview</PanelLabel>
         <h1 className="headline-display font-display mt-2 text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
@@ -83,7 +84,10 @@ export const DashboardView = () => (
           title="Pipeline value"
           hint="Signed against everything still open, by week."
         />
-        <div className="p-2">
+        {/* flex-1 so the chart absorbs the extra height when the taller card
+            in the row stretches this one — otherwise the surplus pools as
+            blank space under the plot. */}
+        <div className="flex flex-1 p-2">
           <PipelineChart />
         </div>
       </Panel>
@@ -94,7 +98,7 @@ export const DashboardView = () => (
           title="Lead funnel"
           hint="Where every business you found sits."
         />
-        <div className="p-2">
+        <div className="flex flex-1 p-2">
           <FunnelChart />
         </div>
       </Panel>
@@ -103,11 +107,13 @@ export const DashboardView = () => (
     <div className="grid gap-4 lg:grid-cols-3">
       <Panel className="lg:col-span-2">
         <PanelHead sample title="Sites shipped" hint="Last seven days." />
-        <EvilGridBarChart
-          data={SAMPLE_SITES_BUILT}
-          totalLabel="[Σ] Sites"
-          peakLabel="[⬆] Best day"
-        />
+        <div className="flex flex-1 flex-col">
+          <EvilGridBarChart
+            data={SAMPLE_SITES_BUILT}
+            totalLabel="[Σ] Sites"
+            peakLabel="[⬆] Best day"
+          />
+        </div>
       </Panel>
 
       <Panel>

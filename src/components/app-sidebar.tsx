@@ -95,9 +95,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       {/* Clerk's own button rather than the block's mock menu — sign-out and
-          account management are already solved there. */}
-      <SidebarFooter className="p-2">
-        <UserControl showName />
+          account management are already solved there. Extra bottom padding
+          keeps the name off the viewport edge, where it was being clipped. */}
+      <SidebarFooter className="px-2 pt-2 pb-4">
+        <div className="min-w-0 overflow-hidden">
+          <UserControl showName />
+        </div>
       </SidebarFooter>
     </Sidebar>
   )

@@ -150,7 +150,9 @@ export const LeadsGrid = () => {
       }}
     >
       <div className="w-full space-y-2.5">
-        <DataGridContainer>
+        {/* Matches the panel it sits inside — a square-cornered table inside
+            a rounded card reads as two different components. */}
+        <DataGridContainer className="rounded-xl border">
           <DataGridScrollArea>
             <DataGridTable />
           </DataGridScrollArea>

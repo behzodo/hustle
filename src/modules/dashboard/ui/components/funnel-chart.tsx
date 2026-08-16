@@ -32,7 +32,10 @@ const chartConfig = {
 
 export const FunnelChart = () => (
   <EvilRadialChart
-    className="h-[260px] w-full"
+    // Fills the panel instead of sitting as a small arc in the middle of it —
+    // this one shares a row with a chart twice its width, so it gets stretched
+    // tall and a fixed height left a dead band underneath.
+    className="h-full min-h-[300px] w-full"
     data={SAMPLE_FUNNEL}
     nameKey="stage"
     config={chartConfig}

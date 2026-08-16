@@ -8,7 +8,11 @@ import { cn } from "@/lib/utils";
  * template. Exported as a string too, for the tiles that need to be an <a>
  * rather than a <section>.
  */
-export const PANEL_CLASS = "bg-white dark:bg-sidebar flex flex-col rounded-xl border";
+// rounded-2xl rather than the xl the rest of the app uses: these panels are
+// much larger than a button or an input, and radius has to grow with the box
+// or big cards read as square.
+export const PANEL_CLASS =
+  "bg-white dark:bg-sidebar flex flex-col rounded-2xl border";
 
 export const Panel = ({
   className,
