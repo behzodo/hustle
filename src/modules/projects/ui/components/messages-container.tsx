@@ -1,15 +1,15 @@
 import { useEffect, useRef } from "react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 
-import { useTRPC } from "@/trpc/client";
-import { Fragment } from "@/generated/prisma";
+import { api } from "@/../convex/_generated/api";
+import type { Fragment, ProjectId } from "@/modules/projects/types";
 
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
 import { MessageLoading } from "./message-loading";
 
 interface Props {
-  projectId: string;
+  projectId: ProjectId;
   activeFragment: Fragment | null;
   setActiveFragment: (fragment: Fragment | null) => void;
 };
@@ -19,33 +19,41 @@ export const MessagesContainer = ({
   activeFragment,
   setActiveFragment
 }: Props) => {
-  const trpc = useTRPC();
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastAssistantMessageIdRef = useRef<string | null>(null);
 
-  const { data: messages } = useSuspenseQuery(trpc.messages.getMany.queryOptions({
-    projectId: projectId,
-  }, {
-    refetchInterval: 2000,
-  }));
+  // Reactive: when the agent writes a message, Convex pushes it here. The
+  // 2-second refetchInterval this replaces was polling for exactly this.
+  const messages = useQuery(api.messages.list, { projectId });
 
   useEffect(() => {
-    const lastAssistantMessage = messages.findLast(
+    const lastAssistantMessage = messages?.findLast(
       (message) => message.role === "ASSISTANT"
     );
 
     if (
       lastAssistantMessage?.fragment &&
-      lastAssistantMessage.id !== lastAssistantMessageIdRef.current
+      lastAssistantMessage._id !== lastAssistantMessageIdRef.current
     ) {
       setActiveFragment(lastAssistantMessage.fragment);
-      lastAssistantMessageIdRef.current = lastAssistantMessage.id;
+      lastAssistantMessageIdRef.current = lastAssistantMessage._id;
     }
   }, [messages, setActiveFragment]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView();
-  }, [messages.length]);
+  }, [messages?.length]);
+
+  // undefined is "still loading" in convex/react, distinct from an empty
+  // project. Rendering the composer under a spinner would let someone queue
+  // a message before the history they are replying to has arrived.
+  if (messages === undefined) {
+    return (
+      <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
+        Loading messages…
+      </div>
+    );
+  }
 
   const lastMessage = messages[messages.length - 1];
   const isLastMessageUser = lastMessage?.role === "USER";
@@ -56,12 +64,12 @@ export const MessagesContainer = ({
         <div className="pt-2 pr-1">
           {messages.map((message) => (
             <MessageCard
-              key={message.id}
+              key={message._id}
               content={message.content}
               role={message.role}
               fragment={message.fragment}
-              createdAt={message.createdAt}
-              isActiveFragment={activeFragment?.id === message.fragment?.id}
+              createdAt={message._creationTime}
+              isActiveFragment={activeFragment?._id === message.fragment?._id}
               onFragmentClick={() => setActiveFragment(message.fragment)}
               type={message.type}
             />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import {
   ArrowUpRightIcon,
   CoinsIcon,
@@ -12,7 +12,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { PANEL_CLASS, PanelLabel, SampleBadge } from "./panel";
 import {
@@ -152,9 +152,8 @@ const Tile = ({
 };
 
 export const StatTiles = () => {
-  const trpc = useTRPC();
-  const projects = useQuery(trpc.projects.getMany.queryOptions());
-  const usage = useQuery(trpc.usage.status.queryOptions());
+  const projects = useQuery(api.projects.list, {});
+  const credits = useQuery(api.credits.status);
 
   const signed = SAMPLE_FUNNEL.find((s) => s.stage === "signed")?.count ?? 0;
   const pipeline = SAMPLE_LEADS.reduce((sum, lead) => sum + lead.value, 0);
@@ -162,10 +161,10 @@ export const StatTiles = () => {
   // A brand new account reads zero across the board, which makes the whole
   // dashboard look broken rather than empty. Fall back to a sample figure —
   // and say so on the tile, so a real zero is never dressed up as traction.
-  const builtCount = projects.data?.length ?? 0;
-  const creditsCount = usage.data?.remainingPoints ?? 0;
-  const buildIsSample = !projects.isPending && builtCount === 0;
-  const creditsIsSample = !usage.isPending && creditsCount === 0;
+  const builtCount = projects?.length ?? 0;
+  const creditsCount = credits?.remainingPoints ?? 0;
+  const buildIsSample = projects !== undefined && builtCount === 0;
+  const creditsIsSample = credits !== undefined && creditsCount === 0;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -176,7 +175,7 @@ export const StatTiles = () => {
         sample={buildIsSample}
         hint="Everything you have generated"
         icon={LayoutIcon}
-        loading={projects.isPending}
+        loading={projects === undefined}
       />
       <Tile
         label="Credits left"
@@ -185,7 +184,7 @@ export const StatTiles = () => {
         hint="Resets on your billing period"
         icon={CoinsIcon}
         href="/pricing"
-        loading={usage.isPending}
+        loading={credits === undefined}
       />
       <Tile
         sample

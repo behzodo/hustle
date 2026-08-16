@@ -5,7 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Suspense, useState } from "react";
 import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
 
-import { Fragment } from "@/generated/prisma";
+import type { Fragment, ProjectId } from "@/modules/projects/types";
 import { isPaidPlan } from "@/lib/entitlements";
 import { Button } from "@/components/ui/button";
 import { UserControl } from "@/components/user-control";
@@ -23,7 +23,7 @@ import { MessagesContainer } from "../components/messages-container";
 import { ErrorBoundary } from "react-error-boundary";
 
 interface Props {
-  projectId: string;
+  projectId: ProjectId;
 };
 
 export const ProjectView = ({ projectId }: Props) => {

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
   SunMoonIcon,
 } from "lucide-react";
 
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
+import type { ProjectId } from "@/modules/projects/types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,14 +26,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface Props {
-  projectId: string;
+  projectId: ProjectId;
 }
 
 export const ProjectHeader = ({ projectId }: Props) => {
-  const trpc = useTRPC();
-  const { data: project } = useSuspenseQuery(
-    trpc.projects.getOne.queryOptions({ id: projectId })
-  );
+  const project = useQuery(api.projects.get, { projectId });
 
   const { setTheme, theme } = useTheme();
 
@@ -46,7 +44,7 @@ export const ProjectHeader = ({ projectId }: Props) => {
             className="focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity pl-2!"
           >
             <Image src="/logo.svg" alt="Hustle" width={18} height={18} />
-            <span className="text-sm font-medium">{project.name}</span>
+            <span className="text-sm font-medium">{project?.name ?? "…"}</span>
             <ChevronDownIcon />
           </Button>
         </DropdownMenuTrigger>

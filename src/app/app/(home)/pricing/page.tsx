@@ -2,12 +2,12 @@
 
 import { useMemo } from "react";
 import { dark } from "@clerk/themes";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { PricingTable, useAuth } from "@clerk/nextjs";
 import { formatDuration, intervalToDuration } from "date-fns";
 
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/../convex/_generated/api";
 import { useCurrentTheme } from "@/hooks/use-current-theme";
 import {
   FREE_POINTS,
@@ -82,14 +82,11 @@ const CreditField = ({ plan, credits, columns, accent }: CreditFieldProps) => (
 // Most people reach this page from the Upgrade button, which appears once
 // credits run low — so lead with where they actually stand.
 const CreditStatus = () => {
-  const trpc = useTRPC();
-  const { isSignedIn, has } = useAuth();
+  const { has } = useAuth();
 
-  const { data: usage } = useQuery({
-    ...trpc.usage.status.queryOptions(),
-    enabled: !!isSignedIn,
-    retry: false,
-  });
+  // The query returns null rather than throwing for signed-out visitors, so
+  // there is nothing to gate on here.
+  const usage = useQuery(api.credits.status);
 
   const resetsIn = useMemo(() => {
     if (!usage) return null;

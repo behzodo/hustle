@@ -2,10 +2,10 @@ import { z } from "zod";
 import { Sandbox } from "@e2b/code-interpreter";
 import { openai, createAgent, createTool, createNetwork, type Tool, type Message, createState } from "@inngest/agent-kit";
 
-import { prisma } from "@/lib/db";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 
 import { inngest } from "./client";
+import { fetchAgentContext, recordAgentResult } from "./convex";
 import { SANDBOX_TIMEOUT } from "./types";
 import { getSandbox, lastAssistantTextMessageContent, parseAgentOutput } from "./utils";
 
@@ -25,27 +25,15 @@ export const codeAgentFunction = inngest.createFunction(
     });
 
     const previousMessages = await step.run("get-previous-messages", async () => {
-      const formattedMessages: Message[] = [];
+      // Already oldest-first from Convex, so nothing to reverse here — the
+      // Prisma version ordered desc and flipped it back.
+      const { messages } = await fetchAgentContext(event.data.projectId, 5);
 
-      const messages = await prisma.message.findMany({
-        where: {
-          projectId: event.data.projectId,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 5,
-      });
-
-      for (const message of messages) {
-        formattedMessages.push({
-          type: "text",
-          role: message.role === "ASSISTANT" ? "assistant" : "user",
-          content: message.content,
-        })
-      }
-
-      return formattedMessages.reverse();
+      return messages.map<Message>((message) => ({
+        type: "text",
+        role: message.role === "ASSISTANT" ? "assistant" : "user",
+        content: message.content,
+      }));
     });
 
     const state = createState<AgentState>(
@@ -228,31 +216,23 @@ export const codeAgentFunction = inngest.createFunction(
 
     await step.run("save-result", async () => {
       if (isError) {
-        return await prisma.message.create({
-          data: {
-            projectId: event.data.projectId,
-            content: "Something went wrong. Please try again.",
-            role: "ASSISTANT",
-            type: "ERROR",
-          },
+        return await recordAgentResult({
+          projectId: event.data.projectId,
+          content: "Something went wrong. Please try again.",
+          type: "ERROR",
         });
       }
 
-      return await prisma.message.create({
-        data: {
-          projectId: event.data.projectId,
-          content: parseAgentOutput(responseOutput),
-          role: "ASSISTANT",
-          type: "RESULT",
-          fragment: {
-            create: {
-              sandboxUrl: sandboxUrl,
-              title: parseAgentOutput(fragmentTitleOuput),
-              files: result.state.data.files,
-            },
-          },
+      return await recordAgentResult({
+        projectId: event.data.projectId,
+        content: parseAgentOutput(responseOutput),
+        type: "RESULT",
+        fragment: {
+          sandboxUrl,
+          title: parseAgentOutput(fragmentTitleOuput),
+          files: result.state.data.files,
         },
-      })
+      });
     });
 
     return { 
