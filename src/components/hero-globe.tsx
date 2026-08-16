@@ -67,7 +67,7 @@ export const HeroGlobe = () => {
         // leaving a hard horizontal edge across the sphere.
         // Allowed to spill past the column on wide screens so the sphere
         // reads at hero scale rather than as an inset illustration.
-        <div className="relative mx-auto aspect-[2/1] w-full max-w-none overflow-hidden md:w-[160%] lg:w-[185%] xl:w-[200%] [mask-image:linear-gradient(to_bottom,black_55%,transparent_98%)]">
+        <div className="relative mx-auto aspect-[2/1] w-full max-w-none overflow-hidden md:w-[190%] lg:w-[220%] xl:w-[245%] [mask-image:linear-gradient(to_bottom,black_55%,transparent_98%)]">
             <Globe
                 className="!max-w-none"
                 config={theme === 'dark' ? DARK : LIGHT}

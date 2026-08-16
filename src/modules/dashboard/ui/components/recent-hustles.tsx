@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowUpRightIcon } from "@phosphor-icons/react";
 
-import { api } from "@/../convex/_generated/api";
+import { useProjects } from "@/modules/projects/use-projects";
 
 /** The caller's newest projects — the one panel here reading live data. */
 export const RecentHustles = () => {
   // undefined while the subscription is still opening.
-  const projects = useQuery(api.projects.list, {});
+  const projects = useProjects();
 
   if (projects === undefined) {
     return (
@@ -27,7 +26,7 @@ export const RecentHustles = () => {
       <div className="py-8 text-center">
         <p className="text-muted-foreground text-sm">Nothing built yet.</p>
         <Link
-          href="/"
+          href="/hustles/new"
           className="mt-2 inline-block text-sm font-medium underline underline-offset-4"
         >
           Build your first site

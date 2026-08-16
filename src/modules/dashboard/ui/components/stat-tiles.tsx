@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { api } from "@/../convex/_generated/api";
 import { NumberTicker } from "@/components/ui/number-ticker";
+import { useProjects } from "@/modules/projects/use-projects";
 import { PANEL_CLASS, PanelLabel, SampleBadge } from "./panel";
 import {
   SAMPLE_CREDITS_LEFT,
@@ -152,7 +153,7 @@ const Tile = ({
 };
 
 export const StatTiles = () => {
-  const projects = useQuery(api.projects.list, {});
+  const projects = useProjects();
   const credits = useQuery(api.credits.status);
 
   const signed = SAMPLE_FUNNEL.find((s) => s.stage === "signed")?.count ?? 0;

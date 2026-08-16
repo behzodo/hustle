@@ -6,6 +6,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 
 import { cn } from "@/lib/utils";
+import { SilkBackdrop } from "@/components/silk-backdrop";
 import { GmailConnection } from "@/modules/connections/ui/gmail-connection";
 import { StripeConnection } from "@/modules/connections/ui/stripe-connection";
 import type { StripeStatus } from "@/modules/connections/server/stripe-status";
@@ -45,90 +46,100 @@ export const ConnectionsView = ({ gmailConnected, stripeStatus }: Props) => {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 md:p-6">
-      <div>
-        <p className="eyebrow text-muted-foreground/70 font-medium">Setup</p>
-        <h1 className="headline-display font-display mt-2 text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
-          {complete ? (
-            <>
-              You are{" "}
-              <span className="headline-figure text-primary italic">wired</span>{" "}
-              up.
-            </>
-          ) : (
-            <>
-              Two accounts,{" "}
-              <span className="headline-figure text-primary italic">paid</span>{" "}
-              clients.
-            </>
-          )}
-        </h1>
-        <p className="deck font-display text-muted-foreground mt-2 text-balance">
-          {complete
-            ? "Everything is connected. Build a site, send it, invoice them."
-            : "Neither is needed to build. Come back when you have someone to pitch."}
-        </p>
+    <div className="relative flex-1">
+      <SilkBackdrop />
 
-        {/* A two-segment meter rather than a number on its own. With only two
+      <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 md:p-6">
+        <div>
+          <p className="eyebrow text-muted-foreground/70 font-medium">Setup</p>
+          <h1 className="headline-display font-display mt-2 text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
+            {complete ? (
+              <>
+                You are{" "}
+                <span className="headline-figure text-primary italic">
+                  wired
+                </span>{" "}
+                up.
+              </>
+            ) : (
+              <>
+                Two accounts,{" "}
+                <span className="headline-figure text-primary italic">
+                  paid
+                </span>{" "}
+                clients.
+              </>
+            )}
+          </h1>
+          <p className="deck font-display text-muted-foreground mt-2 text-balance">
+            {complete
+              ? "Everything is connected. Build a site, send it, invoice them."
+              : "Neither is needed to build. Come back when you have someone to pitch."}
+          </p>
+
+          {/* A two-segment meter rather than a number on its own. With only two
             connections, the bar IS the checklist. */}
-        <div className="mt-5 flex items-center gap-3">
-          <div className="flex flex-1 gap-1.5">
-            {[gmailConnected, stripeReady].map((done, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "h-1.5 flex-1 rounded-full transition-colors duration-500",
-                  done ? "bg-primary" : "bg-muted",
-                )}
-              />
-            ))}
+          <div className="mt-5 flex items-center gap-3">
+            <div className="flex flex-1 gap-1.5">
+              {[gmailConnected, stripeReady].map((done, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "h-1.5 flex-1 rounded-full transition-colors duration-500",
+                    done ? "bg-primary" : "bg-muted",
+                  )}
+                />
+              ))}
+            </div>
+            <span className="text-muted-foreground shrink-0 text-sm">
+              <span className="text-foreground font-medium tabular-nums">
+                {live}
+              </span>{" "}
+              of 2 connected
+            </span>
           </div>
-          <span className="text-muted-foreground shrink-0 text-sm">
-            <span className="text-foreground font-medium tabular-nums">
-              {live}
-            </span>{" "}
-            of 2 connected
-          </span>
         </div>
-      </div>
 
-      <div className="space-y-3">
-        <GmailConnection connected={gmailConnected} />
-        <StripeConnection status={stripeStatus} />
-      </div>
+        <div className="space-y-3">
+          <GmailConnection connected={gmailConnected} />
+          <StripeConnection status={stripeStatus} />
+        </div>
 
-      {/* The sequence the two accounts sit inside. Numbered like a contents
+        {/* The sequence the two accounts sit inside. Numbered like a contents
           page — the figures are set in the display face and left faint, so
           they order the columns without competing with them. */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        {steps.map(({ icon: Icon, title, body, done }, i) => (
-          <div
-            key={title}
-            className={cn(
-              "bg-white dark:bg-sidebar group relative overflow-hidden rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
-              !done && "opacity-60",
-            )}
-          >
-            <span className="headline-figure font-display text-foreground/[0.06] pointer-events-none absolute -top-3 right-1 text-6xl leading-none tabular-nums select-none">
-              {`0${i + 1}`}
-            </span>
-
-            <div className="relative flex items-center justify-between">
-              <Icon className="text-muted-foreground size-5" weight="light" />
-              {done && (
-                <CheckCircleIcon
-                  className="text-primary size-4"
-                  weight="fill"
-                />
+        <div className="grid gap-4 sm:grid-cols-3">
+          {steps.map(({ icon: Icon, title, body, done }, i) => (
+            <div
+              key={title}
+              className={cn(
+                // Translucent rather than solid so the weave behind still reads
+                // through the column — opaque plates would punch three holes in it.
+                "dark:bg-sidebar/60 group relative overflow-hidden rounded-2xl border bg-white/70 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+                !done && "opacity-60",
               )}
-            </div>
+            >
+              <span className="headline-figure font-display text-foreground/[0.06] pointer-events-none absolute -top-3 right-1 text-6xl leading-none tabular-nums select-none">
+                {`0${i + 1}`}
+              </span>
 
-            <p className="relative mt-3 text-sm font-medium">{title}</p>
-            <p className="text-muted-foreground relative mt-1 text-sm leading-snug">
-              {body}
-            </p>
-          </div>
-        ))}
+              <div className="relative flex items-center justify-between">
+                <Icon className="text-muted-foreground size-5" weight="light" />
+                {done && (
+                  <CheckCircleIcon
+                    className="text-primary size-4"
+                    weight="fill"
+                  />
+                )}
+              </div>
+
+              <p className="relative mt-3 text-sm font-medium">{title}</p>
+              <p className="text-muted-foreground relative mt-1 text-sm leading-snug">
+                {body}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/nextjs";
 
-import { appUrl } from "@/lib/site";
+import { WORKSPACE_ENTRY } from "@/lib/site";
 import { Button } from "@/components/ui/landing-button";
 import { useClerkAppearance } from "@/lib/clerk-appearance";
 
@@ -36,8 +36,8 @@ export const SignUpCta = ({
         <SignUpButton
           mode="modal"
           appearance={appearance}
-          forceRedirectUrl={appUrl("/")}
-          signInForceRedirectUrl={appUrl("/")}
+          forceRedirectUrl={WORKSPACE_ENTRY}
+          signInForceRedirectUrl={WORKSPACE_ENTRY}
         >
           <Button {...buttonProps}>{children}</Button>
         </SignUpButton>
@@ -46,7 +46,7 @@ export const SignUpCta = ({
         <Button
           {...buttonProps}
           nativeButton={false}
-          render={<Link href={appUrl("/")}>{signedInLabel}</Link>}
+          render={<Link href={WORKSPACE_ENTRY}>{signedInLabel}</Link>}
         />
       </SignedIn>
     </>
@@ -69,8 +69,8 @@ export const SignInCta = ({
         <SignInButton
           mode="modal"
           appearance={appearance}
-          forceRedirectUrl={appUrl("/")}
-          signUpForceRedirectUrl={appUrl("/")}
+          forceRedirectUrl={WORKSPACE_ENTRY}
+          signUpForceRedirectUrl={WORKSPACE_ENTRY}
         >
           <Button {...buttonProps}>{children}</Button>
         </SignInButton>
@@ -80,7 +80,7 @@ export const SignInCta = ({
           <Button
             {...buttonProps}
             nativeButton={false}
-            render={<Link href={appUrl("/")}>{signedInLabel}</Link>}
+            render={<Link href={WORKSPACE_ENTRY}>{signedInLabel}</Link>}
           />
         </SignedIn>
       ) : null}

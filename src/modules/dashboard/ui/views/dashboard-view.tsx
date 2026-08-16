@@ -67,7 +67,7 @@ export const DashboardView = () => (
         asChild
         className="h-11 rounded-xl px-5 text-sm font-medium tracking-tight"
       >
-        <Link href="/">
+        <Link href="/hustles/new">
           <PlusIcon className="size-4" />
           Build a site
         </Link>

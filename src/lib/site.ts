@@ -34,3 +34,8 @@ export const APP_ORIGIN =
   process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://app.localhost:3000";
 
 export const appUrl = (path = "/") => `${APP_ORIGIN}${path}`;
+
+// Where a landing-page CTA drops you once you have a session. The dashboard,
+// not the workspace root: signing in should land on the overview, not straight
+// into an empty build prompt.
+export const WORKSPACE_ENTRY = appUrl("/dashboard");

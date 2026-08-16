@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
 import { formatDistanceToNow } from "date-fns";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { useProjects } from "@/modules/projects/use-projects";
 
 import { HustleCover } from "../components/hustle-cover";
 
 /** The card that starts a new build. Always first, always the same size. */
 const NewHustleCard = () => (
-  <Link href="/" className="group flex flex-col">
+  <Link href="/hustles/new" className="group flex flex-col">
     <div className="border-muted-foreground/25 group-hover:border-muted-foreground/50 relative aspect-video overflow-hidden rounded-2xl border border-dashed transition-all duration-300 group-hover:-translate-y-1">
       {/* The same miniature, faded back — an empty slot showing what will
           fill it, rather than a dead dashed box. */}
@@ -71,7 +70,7 @@ const CardSkeleton = () => (
 );
 
 export const HustlesView = () => {
-  const projects = useQuery(api.projects.list, {});
+  const projects = useProjects();
 
   return (
     <div className="flex w-full flex-col gap-8 p-4 md:p-6">
@@ -89,7 +88,7 @@ export const HustlesView = () => {
           asChild
           className="h-11 rounded-xl px-5 text-sm font-medium tracking-tight"
         >
-          <Link href="/">
+          <Link href="/hustles/new">
             <PlusIcon className="size-4" />
             New hustle
           </Link>

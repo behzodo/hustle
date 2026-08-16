@@ -9,52 +9,61 @@
      equal to it: display headings mark their payoff phrase with
      text-primary, and without that gap the accent would vanish the moment
      the palette lost its colour. Black is the accent now. */
-  --background: oklch(0.9900 0 0);
-  --foreground: oklch(0.2600 0 0);
-  --card: oklch(1.0000 0 0);
-  --card-foreground: oklch(0.2000 0 0);
-  --popover: oklch(1.0000 0 0);
-  --popover-foreground: oklch(0.2000 0 0);
-  --primary: oklch(0.1000 0 0);
-  --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.9600 0 0);
-  --secondary-foreground: oklch(0.2200 0 0);
-  --muted: oklch(0.9600 0 0);
-  --muted-foreground: oklch(0.5300 0 0);
-  --accent: oklch(0.9450 0 0);
-  --accent-foreground: oklch(0.1800 0 0);
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.26 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+  --primary: oklch(0.1 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.22 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.53 0 0);
+  --accent: oklch(0.945 0 0);
+  --accent-foreground: oklch(0.18 0 0);
   /* Kept red on purpose — it reports failure rather than carrying brand,
      and a grey error state is an error state nobody notices. */
-  --destructive: oklch(0.5500 0.2000 27.0000);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.9000 0 0);
-  --input: oklch(0.8500 0 0);
-  --ring: oklch(0.1000 0 0);
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.85 0 0);
+  --ring: oklch(0.1 0 0);
   /* Charts read as a value ramp instead of a hue wheel. */
-  --chart-1: oklch(0.2000 0 0);
-  --chart-2: oklch(0.3600 0 0);
-  --chart-3: oklch(0.5200 0 0);
-  --chart-4: oklch(0.6800 0 0);
-  --chart-5: oklch(0.8200 0 0);
-  --sidebar: oklch(0.9700 0 0);
-  --sidebar-foreground: oklch(0.2600 0 0);
-  --sidebar-primary: oklch(0.1000 0 0);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.9400 0 0);
-  --sidebar-accent-foreground: oklch(0.1800 0 0);
-  --sidebar-border: oklch(0.9000 0 0);
-  --sidebar-ring: oklch(0.1000 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --chart-1: oklch(0.2 0 0);
+  --chart-2: oklch(0.36 0 0);
+  --chart-3: oklch(0.52 0 0);
+  --chart-4: oklch(0.68 0 0);
+  --chart-5: oklch(0.82 0 0);
+  --sidebar: oklch(0.97 0 0);
+  --sidebar-foreground: oklch(0.26 0 0);
+  --sidebar-primary: oklch(0.1 0 0);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.94 0 0);
+  --sidebar-accent-foreground: oklch(0.18 0 0);
+  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-ring: oklch(0.1 0 0);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+  --shadow-sm:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
   --success: var(--color-emerald-500);
   --success-foreground: var(--color-emerald-900);
@@ -70,49 +79,61 @@
   /* The light palette inverted: --primary is now BRIGHTER than --foreground,
      so the accent still outranks body text and filled buttons read as white
      on near-black. */
-  --background: oklch(0.1450 0 0);
-  --foreground: oklch(0.8800 0 0);
-  --card: oklch(0.1780 0 0);
-  --card-foreground: oklch(0.9400 0 0);
-  --popover: oklch(0.1950 0 0);
-  --popover-foreground: oklch(0.9400 0 0);
-  --primary: oklch(0.9850 0 0);
-  --primary-foreground: oklch(0.1450 0 0);
-  --secondary: oklch(0.2400 0 0);
-  --secondary-foreground: oklch(0.9400 0 0);
-  --muted: oklch(0.2200 0 0);
-  --muted-foreground: oklch(0.6400 0 0);
-  --accent: oklch(0.2600 0 0);
-  --accent-foreground: oklch(0.9600 0 0);
-  --destructive: oklch(0.6000 0.1900 25.0000);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.2750 0 0);
-  --input: oklch(0.3300 0 0);
-  --ring: oklch(0.8500 0 0);
-  --chart-1: oklch(0.9200 0 0);
-  --chart-2: oklch(0.7800 0 0);
-  --chart-3: oklch(0.6200 0 0);
-  --chart-4: oklch(0.4600 0 0);
-  --chart-5: oklch(0.3200 0 0);
-  --sidebar: oklch(0.1650 0 0);
-  --sidebar-foreground: oklch(0.8800 0 0);
-  --sidebar-primary: oklch(0.9850 0 0);
-  --sidebar-primary-foreground: oklch(0.1450 0 0);
-  --sidebar-accent: oklch(0.2300 0 0);
-  --sidebar-accent-foreground: oklch(0.9400 0 0);
-  --sidebar-border: oklch(0.2750 0 0);
-  --sidebar-ring: oklch(0.8500 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.88 0 0);
+  --card: oklch(0.178 0 0);
+  --card-foreground: oklch(0.94 0 0);
+  --popover: oklch(0.195 0 0);
+  --popover-foreground: oklch(0.94 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.24 0 0);
+  --secondary-foreground: oklch(0.94 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.64 0 0);
+  --accent: oklch(0.26 0 0);
+  --accent-foreground: oklch(0.96 0 0);
+  --destructive: oklch(0.6 0.19 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.275 0 0);
+  --input: oklch(0.33 0 0);
+  --ring: oklch(0.85 0 0);
+  --chart-1: oklch(0.92 0 0);
+  --chart-2: oklch(0.78 0 0);
+  --chart-3: oklch(0.62 0 0);
+  --chart-4: oklch(0.46 0 0);
+  --chart-5: oklch(0.32 0 0);
+  /* Lifted further off --background than the shipped value: at 0.165 against
+     a 0.145 page the panel and the content well read as one dark field, and
+     the sidebar stopped looking like a surface at all. */
+  --sidebar: oklch(0.195 0 0);
+  --sidebar-foreground: oklch(0.88 0 0);
+  --sidebar-primary: oklch(0.985 0 0);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.23 0 0);
+  --sidebar-accent-foreground: oklch(0.94 0 0);
+  --sidebar-border: oklch(0.275 0 0);
+  --sidebar-ring: oklch(0.85 0 0);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   --radius: 0.5rem;
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+  --shadow-sm:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl:
+    0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
   --success: var(--color-emerald-500);
   --success-foreground: var(--color-emerald-600);
@@ -186,12 +207,12 @@
   --color-success-foreground: var(--success-foreground);
   --color-success: var(--success);
   @keyframes rippling {
-  0% {
-    opacity: 1;
+    0% {
+      opacity: 1;
     }
-  100% {
-    transform: scale(2);
-    opacity: 0;
+    100% {
+      transform: scale(2);
+      opacity: 0;
     }
   }
 }
@@ -263,13 +284,21 @@
    serifs. WONK swaps in the flared alternates that give the face its
    character. */
 .headline-display {
-  font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1, "wght" 600;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 0,
+    "WONK" 1,
+    "wght" 600;
 }
 
 /* Figures and the accented payoff phrase run heavier than the words around
    them — the thing being promised should carry more weight than the setup. */
 .headline-figure {
-  font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1, "wght" 700;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 0,
+    "WONK" 1,
+    "wght" 700;
 }
 
 /* Standfirst under a display heading — the same family as the headline but
@@ -277,7 +306,92 @@
    opsz drops to the text end of the range, which thickens the hairlines and
    opens the counters so it stays legible small; wght comes back to book. */
 .deck {
-  font-variation-settings: "opsz" 30, "SOFT" 0, "WONK" 1, "wght" 400;
+  font-variation-settings:
+    "opsz" 30,
+    "SOFT" 0,
+    "WONK" 1,
+    "wght" 400;
+}
+
+/* Brushed chrome, mixed from the same neutral metal the logo mark is painted
+   in — #d6d6d6 tint, #ffffff highlight, #0a0a0a shadow, no hue anywhere. Used
+   for the one primary action in the workspace rail.
+
+   A two-stop gradient reads as plastic. Metal needs the value to run
+   dark → light → dark more than once across the face, with the brightest
+   band narrow and off-centre, which is what the stop list below is doing. */
+.metal-plate {
+  position: relative;
+  overflow: hidden;
+  /* Gunmetal on the light theme: a silver plate on a near-white panel has
+     nothing to stand on. The dark theme gets the polished side. */
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 48%),
+    linear-gradient(
+      104deg,
+      #35373a 0%,
+      #6b6d73 13%,
+      #a2a4aa 27%,
+      #4e5054 41%,
+      #85878d 57%,
+      #3b3d41 75%,
+      #66686d 90%,
+      #2c2e31 100%
+    );
+  color: #f4f4f6;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.32),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 1px 3px rgb(0 0 0 / 0.28);
+}
+
+.dark .metal-plate {
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 46%),
+    linear-gradient(
+      104deg,
+      #7a7c82 0%,
+      #c4c6cc 13%,
+      #f4f5f7 28%,
+      #abadb4 42%,
+      #e1e3e9 58%,
+      #92949b 76%,
+      #cbcdd4 90%,
+      #72747a 100%
+    );
+  color: #0f1011;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 2px 8px rgb(0 0 0 / 0.45);
+}
+
+/* The glint crosses on hover only. Running it on a loop would read as a
+   loading bar, which is the one thing this button is not. */
+.metal-plate::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.5) 50%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.metal-plate:hover::after {
+  transform: translateX(130%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metal-plate::after {
+    display: none;
+  }
 }
 
 /* Section eyebrows. Only used where the label is a real nav destination. */

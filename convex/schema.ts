@@ -16,6 +16,25 @@ import { v } from "convex/values";
 export const messageRole = v.union(v.literal("USER"), v.literal("ASSISTANT"));
 export const messageType = v.union(v.literal("RESULT"), v.literal("ERROR"));
 
+// Where a hustle hunts: a point and how far around it to look. Stored as a
+// circle because that is the shape the lead search will ask for — a point,
+// a radius — and a drawn polygon would have to be cut back into circles to
+// be searched at all.
+export const areaValidator = v.object({
+  // Human-readable, e.g. "Headingley, Leeds". Display only; the search uses
+  // the numbers.
+  label: v.string(),
+  // Always set, even when a shape was traced — then they describe the circle
+  // that encloses it. A place search takes a point and a radius and nothing
+  // else, so this keeps the lead search on one code path.
+  lat: v.number(),
+  lng: v.number(),
+  radiusM: v.number(),
+  // The traced outline, when the area was drawn rather than dialled in. The
+  // enclosing circle above finds the candidates; this narrows them.
+  polygon: v.optional(v.array(v.object({ lat: v.number(), lng: v.number() }))),
+});
+
 export default defineSchema({
   projects: defineTable({
     // Clerk user id. A plain string, not a relation — Clerk owns the user
@@ -24,6 +43,9 @@ export default defineSchema({
     name: v.string(),
     // Bumped on every new message so the sidebar can sort by recent activity.
     updatedAt: v.number(),
+    // Optional: every project created before the area step existed has none,
+    // and a project can still be started from a plain prompt.
+    area: v.optional(areaValidator),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_updated", ["userId", "updatedAt"]),

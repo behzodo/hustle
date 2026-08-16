@@ -4,14 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import { formatDistanceToNow } from "date-fns";
-import { useQuery } from "convex/react";
 
-import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { useProjects } from "@/modules/projects/use-projects";
 
 export const ProjectsList = () => {
   const { user } = useUser();
-  const projects = useQuery(api.projects.list, {});
+  const projects = useProjects();
 
   if (!user) return null;
 
