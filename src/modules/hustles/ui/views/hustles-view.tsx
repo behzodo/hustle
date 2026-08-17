@@ -5,9 +5,12 @@ import { formatDistanceToNow } from "date-fns";
 import { PlusIcon } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { useProjects } from "@/modules/projects/use-projects";
 
 import { HustleCover } from "../components/hustle-cover";
+import { HustlesBackdrop } from "../components/hustles-backdrop";
+import { HustleCardMenu } from "../components/hustle-card-menu";
 
 /** The card that starts a new build. Always first, always the same size. */
 const NewHustleCard = () => (
@@ -40,23 +43,32 @@ const HustleCard = ({
   name,
   updatedAt,
 }: {
-  id: string;
+  id: Id<"projects">;
   name: string;
   updatedAt: Date;
 }) => (
-  <Link href={`/projects/${id}`} className="group flex flex-col">
-    {/* No name plate over the top: the miniature is the picture, and the
-        name is already set directly under the card. */}
-    <div className="relative aspect-video overflow-hidden rounded-2xl border transition-transform duration-300 group-hover:-translate-y-1">
-      <HustleCover name={name} className="absolute inset-0" />
+  <div className="group relative flex flex-col">
+    <Link href={`/projects/${id}`} className="flex flex-col">
+      {/* No name plate over the top: the miniature is the picture, and the
+          name is already set directly under the card. */}
+      <div className="relative aspect-video overflow-hidden rounded-2xl border transition-transform duration-300 group-hover:-translate-y-1">
+        <HustleCover name={name} className="absolute inset-0" />
+      </div>
+      <div className="px-1 pt-3">
+        <p className="truncate text-sm font-medium">{name}</p>
+        <p className="text-muted-foreground text-sm">
+          Edited {formatDistanceToNow(updatedAt, { addSuffix: true })}
+        </p>
+      </div>
+    </Link>
+
+    {/* Rides the same lift as the cover so it stays pinned to the corner.
+        Transparent to the cursor, or it would swallow every click meant for
+        the link underneath — the trigger itself opts back in. */}
+    <div className="pointer-events-none absolute inset-x-0 top-0 aspect-video transition-transform duration-300 group-hover:-translate-y-1">
+      <HustleCardMenu id={id} name={name} />
     </div>
-    <div className="px-1 pt-3">
-      <p className="truncate text-sm font-medium">{name}</p>
-      <p className="text-muted-foreground text-sm">
-        Edited {formatDistanceToNow(updatedAt, { addSuffix: true })}
-      </p>
-    </div>
-  </Link>
+  </div>
 );
 
 const CardSkeleton = () => (
@@ -73,42 +85,46 @@ export const HustlesView = () => {
   const projects = useProjects();
 
   return (
-    <div className="flex w-full flex-col gap-8 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="headline-display font-display text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
-            Your hustles
-          </h1>
-          <p className="deck font-display text-muted-foreground mt-2 text-balance">
-            Every site you have built, and the one you have not started yet.
-          </p>
+    <div className="relative flex-1">
+      <HustlesBackdrop />
+
+      <div className="relative flex w-full flex-col gap-8 p-4 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="headline-display font-display text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
+              Your hustles
+            </h1>
+            <p className="deck font-display text-muted-foreground mt-2 text-balance">
+              Every site you have built, and the one you have not started yet.
+            </p>
+          </div>
+
+          <Button
+            asChild
+            className="h-11 rounded-xl px-5 text-sm font-medium tracking-tight"
+          >
+            <Link href="/hustles/new">
+              <PlusIcon className="size-4" />
+              New hustle
+            </Link>
+          </Button>
         </div>
 
-        <Button
-          asChild
-          className="h-11 rounded-xl px-5 text-sm font-medium tracking-tight"
-        >
-          <Link href="/hustles/new">
-            <PlusIcon className="size-4" />
-            New hustle
-          </Link>
-        </Button>
-      </div>
+        <div className="grid gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+          <NewHustleCard />
 
-      <div className="grid gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
-        <NewHustleCard />
+          {projects === undefined &&
+            [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
 
-        {projects === undefined &&
-          [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
-
-        {projects?.map((project) => (
-          <HustleCard
-            key={project._id}
-            id={project._id}
-            name={project.name}
-            updatedAt={new Date(project.updatedAt)}
-          />
-        ))}
+          {projects?.map((project) => (
+            <HustleCard
+              key={project._id}
+              id={project._id}
+              name={project.name}
+              updatedAt={new Date(project.updatedAt)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

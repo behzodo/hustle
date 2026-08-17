@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { EvilGridBarChart } from "@/components/evilcharts/blocks/grid-bar-chart";
 
 import { SAMPLE_SITES_BUILT } from "../../constants";
+import { DashboardBackdrop } from "../components/dashboard-backdrop";
 import { FunnelChart } from "../components/funnel-chart";
 import { LeadsGrid } from "../components/leads-grid";
 import { Panel, PanelLabel, SampleBadge } from "../components/panel";
@@ -47,92 +48,101 @@ const PanelHead = ({
 );
 
 export const DashboardView = () => (
-  <div className="flex w-full flex-col gap-4 p-4 md:p-6">
-    {/* Page head. items-center, not items-end: against a three-line text
+  <div className="relative flex-1">
+    <DashboardBackdrop />
+
+    {/* Positioned, and after the backdrop in source order — that is the only
+        thing keeping it painted above it, since both sit at the same layer. */}
+    <div className="relative flex w-full flex-col gap-4 p-4 md:p-6">
+      {/* Page head. items-center, not items-end: against a three-line text
         block the button was landing level with nothing, reading as adrift. */}
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <PanelLabel>Overview</PanelLabel>
-        <h1 className="headline-display font-display mt-2 text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
-          Your{" "}
-          <span className="headline-figure text-primary italic">hustle</span>,
-          end to end.
-        </h1>
-        <p className="deck font-display text-muted-foreground mt-2 text-balance">
-          Sites built, credits left, and every lead between found and signed.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <PanelLabel>Overview</PanelLabel>
+          <h1 className="headline-display font-display mt-2 text-3xl leading-[1.02] tracking-[-0.03em] text-balance md:text-4xl">
+            Your{" "}
+            <span className="headline-figure text-primary italic">hustle</span>,
+            end to end.
+          </h1>
+          <p className="deck font-display text-muted-foreground mt-2 text-balance">
+            Sites built, credits left, and every lead between found and signed.
+          </p>
+        </div>
+
+        <Button
+          asChild
+          className="h-11 rounded-xl px-5 text-sm font-medium tracking-tight"
+        >
+          <Link href="/hustles/new">
+            <PlusIcon className="size-4" />
+            Build a site
+          </Link>
+        </Button>
       </div>
 
-      <Button
-        asChild
-        className="h-11 rounded-xl px-5 text-sm font-medium tracking-tight"
-      >
-        <Link href="/hustles/new">
-          <PlusIcon className="size-4" />
-          Build a site
-        </Link>
-      </Button>
-    </div>
+      <StatTiles />
 
-    <StatTiles />
-
-    {/* Pipeline gets the wide column — it is the money chart. */}
-    <div className="grid gap-4 lg:grid-cols-3">
-      <Panel className="lg:col-span-2">
-        <PanelHead
-          sample
-          title="Pipeline value"
-          hint="Signed against everything still open, by week."
-        />
-        {/* flex-1 so the chart absorbs the extra height when the taller card
+      {/* Pipeline gets the wide column — it is the money chart. */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel className="lg:col-span-2">
+          <PanelHead
+            sample
+            title="Pipeline value"
+            hint="Signed against everything still open, by week."
+          />
+          {/* flex-1 so the chart absorbs the extra height when the taller card
             in the row stretches this one — otherwise the surplus pools as
             blank space under the plot. */}
-        <div className="flex flex-1 p-2">
-          <PipelineChart />
-        </div>
-      </Panel>
+          <div className="flex flex-1 p-2">
+            <PipelineChart />
+          </div>
+        </Panel>
+
+        <Panel>
+          <PanelHead
+            sample
+            title="Lead funnel"
+            hint="Where every business you found sits."
+          />
+          <div className="flex flex-1 p-2">
+            <FunnelChart />
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel className="lg:col-span-2">
+          <PanelHead sample title="Sites shipped" hint="Last seven days." />
+          <div className="flex flex-1 flex-col">
+            <EvilGridBarChart
+              data={SAMPLE_SITES_BUILT}
+              totalLabel="[Σ] Sites"
+              peakLabel="[⬆] Best day"
+            />
+          </div>
+        </Panel>
+
+        <Panel>
+          <PanelHead
+            title="Recent hustles"
+            hint="Straight from your projects."
+          />
+          <div className="p-5">
+            <RecentHustles />
+          </div>
+        </Panel>
+      </div>
 
       <Panel>
         <PanelHead
           sample
-          title="Lead funnel"
-          hint="Where every business you found sits."
+          title="Latest leads"
+          hint="Sortable — click a column header to reorder."
         />
-        <div className="flex flex-1 p-2">
-          <FunnelChart />
-        </div>
-      </Panel>
-    </div>
-
-    <div className="grid gap-4 lg:grid-cols-3">
-      <Panel className="lg:col-span-2">
-        <PanelHead sample title="Sites shipped" hint="Last seven days." />
-        <div className="flex flex-1 flex-col">
-          <EvilGridBarChart
-            data={SAMPLE_SITES_BUILT}
-            totalLabel="[Σ] Sites"
-            peakLabel="[⬆] Best day"
-          />
-        </div>
-      </Panel>
-
-      <Panel>
-        <PanelHead title="Recent hustles" hint="Straight from your projects." />
         <div className="p-5">
-          <RecentHustles />
+          <LeadsGrid />
         </div>
       </Panel>
     </div>
-
-    <Panel>
-      <PanelHead
-        sample
-        title="Latest leads"
-        hint="Sortable — click a column header to reorder."
-      />
-      <div className="p-5">
-        <LeadsGrid />
-      </div>
-    </Panel>
   </div>
 );

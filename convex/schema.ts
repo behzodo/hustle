@@ -35,6 +35,28 @@ export const areaValidator = v.object({
   polygon: v.optional(v.array(v.object({ lat: v.number(), lng: v.number() }))),
 });
 
+// One billed Google Maps search: a phrase pinned to a point at a zoom. The
+// whole plan is fixed when a hunt starts and never grows, so the cost of a
+// sweep is knowable before the first request goes out.
+export const huntQueryValidator = v.object({
+  q: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  zoom: v.number(),
+});
+
+// What a business is using instead of a website. `site` means they have their
+// own domain and are not a prospect; see src/modules/hustles/discovery/lead.ts
+// for why a Facebook page counts as a gap rather than a website.
+export const webPresence = v.union(
+  v.literal("none"),
+  v.literal("social"),
+  v.literal("site"),
+  // Only OpenStreetMap produces this: its website tag is crowd-sourced, so an
+  // absent one means unrecorded rather than non-existent.
+  v.literal("unknown"),
+);
+
 export default defineSchema({
   projects: defineTable({
     // Clerk user id. A plain string, not a relation — Clerk owns the user
@@ -56,6 +78,93 @@ export default defineSchema({
     role: messageRole,
     type: messageType,
   }).index("by_project", ["projectId"]),
+
+  // One sweep of a hustle's patch: the plan it is working through, how far it
+  // has got, and what it cost.
+  //
+  // The row exists so the sweep can be resumed and so the screen can show it
+  // happening. A Convex action is capped at ten minutes and a wide patch is
+  // dozens of slow scrapes, so `cursor` is what lets one sweep run across many
+  // scheduled actions instead of one that times out halfway and loses
+  // everything it had found.
+  hunts: defineTable({
+    projectId: v.id("projects"),
+    // Denormalised from the project so a lead read never needs a second
+    // lookup to prove ownership.
+    userId: v.string(),
+    status: v.union(
+      v.literal("running"),
+      v.literal("done"),
+      v.literal("failed"),
+      v.literal("stopped"),
+    ),
+    queries: v.array(huntQueryValidator),
+    // Index of the next unrun query. Equal to `queries.length` when finished.
+    cursor: v.number(),
+    // Listings Google returned that fell inside the patch.
+    scanned: v.number(),
+    // Of those, the ones with no website of their own.
+    found: v.number(),
+    // Billed Scrape.do requests so far. The bill, in plain sight.
+    requests: v.number(),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    // Why it stopped, when it stopped badly. Shown to the user — a hunt that
+    // fails silently looks like an empty town.
+    error: v.optional(v.string()),
+    // Country perspective for the search: "us" or "ca".
+    gl: v.string(),
+    // Which maps provider ran it. Optional because hunts from before the
+    // engine could switch providers have none — and because what a sweep cost
+    // is only answerable next to who was asked.
+    provider: v.optional(v.string()),
+  }).index("by_project", ["projectId"]),
+
+  // A business found in a hustle's patch.
+  //
+  // Businesses that already have their own website are kept, not discarded.
+  // They are the denominator: "41 of 260 have no site" is the number that
+  // tells a user whether the patch is worth working, and a table holding only
+  // the hits cannot produce it. `presence` is what separates the two.
+  leads: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    huntId: v.id("hunts"),
+    // Google's id for the listing. The same business turns up in several
+    // overlapping tiles and under several search terms, so this is what stops
+    // one shop becoming six leads.
+    placeId: v.string(),
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    // Whatever the listing linked, if anything — including the Facebook page
+    // or Linktree that counts as a gap rather than a site.
+    website: v.optional(v.string()),
+    presence: webPresence,
+    // `presence !== "site"`, stored rather than derived so the working list
+    // can be an index range instead of a table scan that filters afterwards.
+    target: v.boolean(),
+    // Which platform, when `presence` is "social". A SocialKind slug.
+    socialKind: v.optional(v.string()),
+    rating: v.optional(v.number()),
+    reviewCount: v.optional(v.number()),
+    // Google's own categories, e.g. ["Hair salon", "Barber shop"].
+    categories: v.array(v.string()),
+    // 0–100, worth-pitching-ness. See scoreLead().
+    score: v.number(),
+    // The search phrase that turned it up, so a surprising lead can be
+    // explained rather than mistrusted.
+    term: v.string(),
+  })
+    .index("by_project", ["projectId"])
+    // Dedupe on write. Every absorbed listing checks this before inserting.
+    .index("by_project_and_place", ["projectId", "placeId"])
+    // Everything found, best first — the denominator view.
+    .index("by_project_and_score", ["projectId", "score"])
+    // The working list: only the businesses with a gap, best first.
+    .index("by_project_target_and_score", ["projectId", "target", "score"]),
 
   fragments: defineTable({
     messageId: v.id("messages"),

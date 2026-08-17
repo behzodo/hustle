@@ -53,13 +53,17 @@ const Tile = ({
   const body = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <PanelLabel className={featured ? "text-primary-foreground/70" : ""}>
+        {/* On the chrome tile every colour is inherited from the plate rather
+            than named, so the label, hint, badge and icon stay legible
+            whichever way the metal is mixed for the current theme. */}
+        <PanelLabel className={featured ? "text-inherit opacity-65" : ""}>
           {label}
         </PanelLabel>
         <Icon
+          weight="light"
           className={cn(
-            "size-4 shrink-0",
-            featured ? "text-primary-foreground/70" : "text-muted-foreground",
+            "size-[18px] shrink-0",
+            featured ? "text-inherit opacity-65" : "text-muted-foreground",
           )}
         />
       </div>
@@ -101,19 +105,17 @@ const Tile = ({
         <p
           className={cn(
             "text-xs",
-            featured ? "text-primary-foreground/70" : "text-muted-foreground",
+            featured ? "text-inherit opacity-65" : "text-muted-foreground",
           )}
         >
           {hint}
         </p>
         {/* The badge's muted grey is tuned for the page background, and goes
-            invisible on the inverted tile. */}
+            invisible on the plated tile. */}
         {sample && (
           <SampleBadge
             className={
-              featured
-                ? "border-primary-foreground/30 text-primary-foreground/70"
-                : undefined
+              featured ? "border-current/30 text-inherit opacity-65" : undefined
             }
           />
         )}
@@ -121,7 +123,7 @@ const Tile = ({
           <ArrowUpRightIcon
             className={cn(
               "ml-auto size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
-              featured ? "text-primary-foreground/70" : "text-muted-foreground",
+              featured ? "text-inherit opacity-65" : "text-muted-foreground",
             )}
           />
         )}
@@ -132,12 +134,15 @@ const Tile = ({
   const className = cn(
     PANEL_CLASS,
     "group p-5 transition-colors",
-    // dark:bg-primary is not redundant. PANEL_CLASS carries dark:bg-sidebar,
-    // and tailwind-merge treats a dark: utility as a different group from an
-    // unprefixed one — so a bare bg-primary loses to it in dark mode, which
-    // left this tile dark-on-dark and unreadable.
+    // The accent tile is a milled plate — the same chrome as the New hustle
+    // button and the support disc, rather than a flat white rectangle sitting
+    // among three dark ones. metal-plate paints an opaque gradient and carries
+    // its own rim light, so the panel's fill and border are handed back.
+    //
+    // [&>*] because the plate's sheen is painted at z-index 1: without a layer
+    // of their own the label and the figure sweep under it.
     featured &&
-      "bg-primary dark:bg-primary text-primary-foreground border-primary",
+      "metal-plate bg-transparent dark:bg-transparent border-transparent [&>*]:relative [&>*]:z-[2]",
     href && !featured && "hover:bg-muted/50",
   );
 

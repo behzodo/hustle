@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
-import { useQuery } from "convex/react";
 
-import { api } from "@/../convex/_generated/api";
 import type { Fragment, ProjectId } from "@/modules/projects/types";
+import { useMessages } from "@/modules/projects/use-projects";
 
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
@@ -24,7 +23,7 @@ export const MessagesContainer = ({
 
   // Reactive: when the agent writes a message, Convex pushes it here. The
   // 2-second refetchInterval this replaces was polling for exactly this.
-  const messages = useQuery(api.messages.list, { projectId });
+  const messages = useMessages(projectId);
 
   useEffect(() => {
     const lastAssistantMessage = messages?.findLast(

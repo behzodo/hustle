@@ -1,15 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { useQuery } from "convex/react";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
   SunMoonIcon,
 } from "lucide-react";
 
-import { api } from "@/../convex/_generated/api";
 import type { ProjectId } from "@/modules/projects/types";
+import { useProject } from "@/modules/projects/use-projects";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,7 +29,7 @@ interface Props {
 }
 
 export const ProjectHeader = ({ projectId }: Props) => {
-  const project = useQuery(api.projects.get, { projectId });
+  const project = useProject(projectId);
 
   const { setTheme, theme } = useTheme();
 

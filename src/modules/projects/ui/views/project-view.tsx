@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
 import { useAuth } from "@clerk/nextjs";
 import { Suspense, useState } from "react";
 import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
 
-import { api } from "@/../convex/_generated/api";
 import type { Fragment, ProjectId } from "@/modules/projects/types";
+import { useMessages } from "@/modules/projects/use-projects";
 import { isPaidPlan } from "@/lib/entitlements";
 import { Button } from "@/components/ui/button";
 import { UserControl } from "@/components/user-control";
@@ -40,7 +39,7 @@ export const ProjectView = ({ projectId }: Props) => {
   // Same query and args MessagesContainer subscribes to, so this is the same
   // subscription rather than a second one — Convex hands both callers the one
   // cached result.
-  const messages = useQuery(api.messages.list, { projectId });
+  const messages = useMessages(projectId);
 
   // undefined is still loading. Committing to a layout before the count is
   // known would flash the split panes on a brand-new hustle.

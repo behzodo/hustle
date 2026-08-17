@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
 import {
   FolderSimpleIcon,
   HammerIcon,
@@ -10,7 +9,6 @@ import {
   SquaresFourIcon,
 } from "@phosphor-icons/react";
 
-import { api } from "@/../convex/_generated/api";
 import { MetallicLogo } from "@/components/metallic-logo";
 import { UserControl } from "@/components/user-control";
 import { motion } from "motion/react";
@@ -22,6 +20,7 @@ import {
   type HoverSidebarLinkItem,
 } from "@/components/ui/hover-sidebar";
 import type { ProjectId } from "@/modules/projects/types";
+import { useProject } from "@/modules/projects/use-projects";
 
 /**
  * The rail down the side of a hustle's workspace.
@@ -58,7 +57,7 @@ const Brand = ({ name }: { name?: string }) => {
 };
 
 export const ProjectSidebar = ({ projectId }: { projectId: ProjectId }) => {
-  const project = useQuery(api.projects.get, { projectId });
+  const project = useProject(projectId);
 
   const links: HoverSidebarLinkItem[] = [
     {

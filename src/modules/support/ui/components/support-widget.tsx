@@ -68,34 +68,40 @@ export const SupportWidget = () => {
         <SupportChat className="flex-1" />
       </div>
 
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-label={open ? "Close support" : "Open support"}
-        className="bg-primary text-primary-foreground group fixed right-4 bottom-4 z-50 flex size-13 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-      >
-        {/* One icon rotates out as the other rotates in, so the button reads
-            as a single control changing state rather than two buttons. */}
-        <ChatCircleDotsIcon
-          className={cn(
-            "absolute size-5 transition-all duration-300",
-            open ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0",
-          )}
-          weight="fill"
-        />
-        <XIcon
-          className={cn(
-            "absolute size-5 transition-all duration-300",
-            open ? "scale-100 rotate-0" : "scale-0 -rotate-90 opacity-0",
-          )}
-          weight="bold"
-        />
-
-        {/* A single ping while closed, to say the helper is there. */}
+      {/* The plate clips its own overflow so the sheen stays inside the disc,
+          which means the ping cannot live in the button — it rings from a
+          wrapper sitting directly behind it instead. The wrapper also carries
+          the drop shadow, since the plate owns the button's own box-shadow. */}
+      <div className="fixed right-4 bottom-4 z-50 rounded-full shadow-xl">
         {!open && (
-          <span className="bg-primary/30 absolute inset-0 animate-ping rounded-full [animation-duration:3s]" />
+          <span className="bg-foreground/25 pointer-events-none absolute inset-0 animate-ping rounded-full [animation-duration:3s]" />
         )}
-      </button>
+
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? "Close support" : "Open support"}
+          className="metal-plate group relative flex size-13 items-center justify-center rounded-full transition-transform duration-300 hover:scale-105 active:scale-95"
+        >
+          {/* One icon rotates out as the other rotates in, so the button reads
+              as a single control changing state rather than two buttons. Both
+              sit above the sheen, which is painted at z-index 1. */}
+          <ChatCircleDotsIcon
+            className={cn(
+              "absolute z-[2] size-5 transition-all duration-300",
+              open ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0",
+            )}
+            weight="fill"
+          />
+          <XIcon
+            className={cn(
+              "absolute z-[2] size-5 transition-all duration-300",
+              open ? "scale-100 rotate-0" : "scale-0 -rotate-90 opacity-0",
+            )}
+            weight="bold"
+          />
+        </button>
+      </div>
     </>
   );
 };
