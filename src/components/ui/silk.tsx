@@ -2,9 +2,10 @@
 
 import { Color, type Mesh, type ShaderMaterial } from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useRef, useMemo, useEffect, useState, useLayoutEffect } from "react";
+import { useRef, useMemo, useEffect, useLayoutEffect } from "react";
 
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
 
 const hexToNormalizedRGB = (hex: string): [number, number, number] => {
   const clean = hex.replace("#", "");
@@ -131,7 +132,7 @@ export const Silk = ({
   rotation = 0,
   className,
 }: Props) => {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
 
   // Built once and then mutated in place — swapping the object would force a
   // new shader program on every prop change.
@@ -147,8 +148,6 @@ export const Silk = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     uniforms.uSpeed.value = speed;

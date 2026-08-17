@@ -11,8 +11,12 @@ import { cn } from "@/lib/utils";
 // rounded-2xl rather than the xl the rest of the app uses: these panels are
 // much larger than a button or an input, and radius has to grow with the box
 // or big cards read as square.
+//
+// `milled` is the shared top-edge catch-light — see globals.css. Every card
+// surface in the product wears it, so it lives there rather than as a magic
+// shadow value copied into each one.
 export const PANEL_CLASS =
-  "bg-white dark:bg-sidebar flex flex-col rounded-2xl border";
+  "milled bg-white dark:bg-sidebar flex flex-col rounded-2xl border";
 
 export const Panel = ({
   className,

@@ -45,8 +45,12 @@ export const SupportChat = ({ className }: { className?: string }) => {
         {messages.length === 0 && (
           <div className="py-4">
             <div className="text-center">
-              <span className="bg-muted mx-auto flex size-10 items-center justify-center rounded-full">
-                <SparkleIcon className="size-5" weight="fill" />
+              {/* Milled, like the New hustle plate and the support disc —
+                  the mark that opens the assistant is the same material as
+                  every other thing in the product you act on. The icon needs
+                  a layer of its own; the plate's sheen is painted at z 1. */}
+              <span className="metal-plate mx-auto flex size-10 items-center justify-center rounded-full">
+                <SparkleIcon className="relative z-[2] size-5" weight="fill" />
               </span>
               <p className="font-display headline-display mt-3 text-lg tracking-[-0.02em]">
                 Ask about Hustle
@@ -143,9 +147,9 @@ export const SupportChat = ({ className }: { className?: string }) => {
             type="submit"
             size="icon-sm"
             disabled={!input.trim() || busy}
-            className="shrink-0 rounded-full transition-transform disabled:opacity-40 not-disabled:hover:scale-105"
+            className="metal-plate shrink-0 rounded-full bg-transparent transition-transform disabled:opacity-40 not-disabled:hover:scale-105"
           >
-            <ArrowUpIcon className="size-4" weight="bold" />
+            <ArrowUpIcon className="relative z-[2] size-4" weight="bold" />
           </Button>
         </div>
       </form>

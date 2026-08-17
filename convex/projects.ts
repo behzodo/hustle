@@ -222,6 +222,27 @@ export const remove = mutation({
       await ctx.db.delete(message._id);
     }
 
+    // Discovery's rows hang off the project too, and there are far more of
+    // them than messages — a swept patch is hundreds of leads. Left behind
+    // they are unreachable forever: every read of them starts from a project
+    // id that no longer resolves.
+    const leads = await ctx.db
+      .query("leads")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    for (const lead of leads) await ctx.db.delete(lead._id);
+
+    const hunts = await ctx.db
+      .query("hunts")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    // A sweep still in flight stops on its own once its row is gone: both
+    // `sweep` and `absorb` read the hunt first and return when it is missing,
+    // so the next scheduled step spends nothing and writes nothing.
+    for (const hunt of hunts) await ctx.db.delete(hunt._id);
+
     await ctx.db.delete(projectId);
     return null;
   },
