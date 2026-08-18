@@ -107,6 +107,31 @@ const leadShape = v.object({
   photo: v.optional(v.string()),
   score: v.number(),
   term: v.string(),
+  // The site built for this business, and where it is in the queue.
+  //
+  // A `returns` validator on a query is exact: a field present on the document
+  // and absent here is a thrown error, not an omission. So these have to be
+  // restated whenever convex/schema.ts grows a column on `leads`, and the day
+  // this was written they were not — which took the whole Building screen down
+  // for every business the fast lane had already built.
+  site: v.optional(
+    v.object({
+      slug: v.string(),
+      url: v.string(),
+      template: v.string(),
+      publishedAt: v.number(),
+    }),
+  ),
+  siteStatus: v.optional(
+    v.union(
+      v.literal("queued"),
+      v.literal("building"),
+      v.literal("live"),
+      v.literal("failed"),
+    ),
+  ),
+  siteError: v.optional(v.string()),
+  siteStartedAt: v.optional(v.number()),
 });
 
 /** A listing as the sweep hands it to the writer. */

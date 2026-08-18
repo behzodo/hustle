@@ -68,9 +68,42 @@ export default defineSchema({
     // Optional: every project created before the area step existed has none,
     // and a project can still be started from a plain prompt.
     area: v.optional(areaValidator),
+    // The sandbox this project's site was last built in.
+    //
+    // Kept so the next message about a site can be answered on the bench that
+    // still has that site on it, rather than rebuilding the tree from nothing
+    // every time. The provider travels with the id because it is the only way
+    // to know who to ask: an id from one vendor means nothing to another, and
+    // asking the wrong one returns "gone" rather than an error worth reading.
+    //
+    // Absent until a build finishes, and safe to be stale — a bench that has
+    // been reaped simply produces a fresh one.
+    bench: v.optional(v.object({ id: v.string(), provider: v.string() })),
+    // Where this project's site is published, once it has been.
+    //
+    // The slug is claimed on the first successful build and then never
+    // changes, because it is the address a client was given. A rename of the
+    // project, a rebuild, a different sandbox — none of them may move it. That
+    // is the whole reason it is stored on the project rather than derived from
+    // the name every time.
+    site: v.optional(
+      v.object({
+        // The subdomain, e.g. "joes-gym" for joes-gym.korvians.online.
+        slug: v.string(),
+        // The full address, kept whole so nothing has to rebuild it from the
+        // slug and an environment variable that may since have changed.
+        url: v.string(),
+        // Absent between claiming the name and the first upload landing.
+        publishedAt: v.optional(v.number()),
+      }),
+    ),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_updated", ["userId", "updatedAt"]),
+    .index("by_user_and_updated", ["userId", "updatedAt"])
+    // Uniqueness, enforced by looking before claiming. Two barbers called Fade
+    // in one city is not a rare event, and the loser of that race would
+    // otherwise overwrite the winner's site.
+    .index("by_slug", ["site.slug"]),
 
   messages: defineTable({
     projectId: v.id("projects"),
@@ -179,8 +212,51 @@ export default defineSchema({
     // The search phrase that turned it up, so a surprising lead can be
     // explained rather than mistrusted.
     term: v.string(),
+    // The site built for this business, once one has been.
+    //
+    // Every lead gets its own — that is the product. A hustle is a patch of a
+    // town and a lead is one shop in it, so the address belongs to the shop
+    // and not to the sweep that found it.
+    //
+    // Claimed on the first build and never moved afterwards, for the same
+    // reason as projects.site: it is what went in an email.
+    site: v.optional(
+      v.object({
+        slug: v.string(),
+        url: v.string(),
+        // Which of the four looks was used, so a rebuild is consistent and a
+        // template that turns out to be wrong for a trade can be found again.
+        template: v.string(),
+        publishedAt: v.number(),
+      }),
+    ),
+    // Where this lead is in the build queue. Absent means never queued —
+    // which is every lead swept before the fast lane existed.
+    siteStatus: v.optional(
+      v.union(
+        v.literal("queued"),
+        v.literal("building"),
+        v.literal("live"),
+        v.literal("failed"),
+      ),
+    ),
+    // Why it failed, shown on the card. A lead that failed silently looks
+    // identical to one nobody has got to yet.
+    siteError: v.optional(v.string()),
+    // When the current build started.
+    //
+    // Only meaningful while `siteStatus` is "building", and it exists because
+    // that status is a claim rather than a fact: a worker that dies mid-build
+    // never clears it, and without a time to compare against, the business it
+    // was working on stays claimed by nobody forever. See STALE_BUILD_MS.
+    siteStartedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
+    // Shares one namespace with projects.site.slug — both publish under the
+    // same domain, so both claims check both tables. See convex/sites.ts.
+    .index("by_slug", ["site.slug"])
+    // The queue: everything in one hustle waiting to be built, best first.
+    .index("by_project_status_and_score", ["projectId", "siteStatus", "score"])
     // Dedupe on write. Every absorbed listing checks this before inserting.
     .index("by_project_and_place", ["projectId", "placeId"])
     // Everything found, best first — the denominator view.
@@ -206,6 +282,13 @@ export default defineSchema({
     // real projects start tripping it, the fix is to move this blob to
     // ctx.storage and keep an Id<"_storage"> in its place.
     files: v.record(v.string(), v.string()),
+    // The published address, when this build was published.
+    //
+    // Separate from `sandboxUrl` because they are different promises.
+    // `sandboxUrl` is the bench, live and editable and gone within the hour;
+    // this is the copy in R2 that a client can be sent. Optional because
+    // every fragment written before publishing existed has only the first.
+    siteUrl: v.optional(v.string()),
   }).index("by_message", ["messageId"]),
 
   profiles: defineTable({

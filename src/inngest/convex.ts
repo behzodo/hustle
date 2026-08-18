@@ -40,12 +40,32 @@ const call = async <T>(path: string, body: unknown): Promise<T> => {
   return (await res.json()) as T;
 };
 
-/** The last few messages of a project, for the agent's memory window. */
+/**
+ * The last few messages of a project, for the agent's memory window, and the
+ * project itself — whose name the published subdomain is derived from.
+ *
+ * `project` is null for a project deleted mid-run, which is rare but not
+ * impossible: a build takes half an hour and the sidebar has a delete button.
+ */
 export const fetchAgentContext = (projectId: string, take = 5) =>
-  call<{ messages: { content: string; role: "USER" | "ASSISTANT" }[] }>(
-    "/agent/context",
-    { projectId, take },
-  );
+  call<{
+    messages: { content: string; role: "USER" | "ASSISTANT" }[];
+    project: { name: string } | null;
+  }>("/agent/context", { projectId, take });
+
+/**
+ * Reserve the subdomain this project publishes at.
+ *
+ * Sent as a list in preference order — see slugCandidates — so a name already
+ * taken is resolved inside the one round trip rather than by asking again.
+ * Returns whatever the project already holds if it has published before, which
+ * is what keeps a link that has been sent to a client pointing at the site.
+ */
+export const claimAgentSite = (body: {
+  projectId: string;
+  candidates: string[];
+  domain: string;
+}) => call<{ slug: string; url: string }>("/agent/site", body);
 
 /** Persist the run's outcome, with its fragment when there is one. */
 export const recordAgentResult = (body: {
@@ -56,5 +76,62 @@ export const recordAgentResult = (body: {
     sandboxUrl: string;
     title: string;
     files: Record<string, string>;
+    /** Where it was published, when the upload succeeded. */
+    siteUrl?: string;
   };
+  /** The sandbox the run worked in, so the next run can resume it. */
+  bench?: { id: string; provider: string };
 }) => call<{ messageId: string }>("/agent/result", body);
+
+/* ---------------------------------------------------------------------------
+ * The fast lane. One lead, one site, no sandbox.
+ * ------------------------------------------------------------------------- */
+
+/** What is known about the business, plus the voice its site should be in. */
+export interface LeadContext {
+  name: string;
+  trade: string;
+  categories: string[];
+  town?: string;
+  phone?: string;
+  address?: string;
+  mapsUrl?: string;
+  rating?: number;
+  reviewCount?: number;
+  photo?: string;
+  tone?: string;
+  alreadyLive: boolean;
+}
+
+export const fetchLeadContext = (leadId: string) =>
+  call<{ lead: LeadContext | null }>("/site/context", { leadId });
+
+export const claimLeadSite = (body: {
+  leadId: string;
+  candidates: string[];
+  domain: string;
+}) => call<{ slug: string; url: string }>("/site/claim", body);
+
+/** Says how it went. One shape for both outcomes so neither can be forgotten. */
+export const recordLeadSite = (
+  body:
+    | { leadId: string; slug: string; url: string; template: string; error?: never }
+    | { leadId: string; error: string },
+) => call<{ ok: boolean }>("/site/result", body);
+
+/** Marks a hustle's worth-pitching businesses as waiting to be built. */
+export const queueProjectSites = (body: { projectId: string; rebuild?: boolean }) =>
+  call<{ queued: number; skipped: number }>("/site/queue", body);
+
+/**
+ * Takes the next business off a hustle's queue, best score first.
+ *
+ * Claims as it reads, so two workers calling this at once get two different
+ * businesses. Returns null when the queue is empty, which is how a worker
+ * knows to stop rather than by being told how much work there was.
+ */
+export const takeNextSite = (projectId: string) =>
+  call<{ next: { leadId: string; name: string; score: number } | null }>(
+    "/site/next",
+    { projectId },
+  );

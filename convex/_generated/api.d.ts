@@ -22,6 +22,7 @@ import type * as lib_places_types from "../lib/places/types.js";
 import type * as messages from "../messages.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
+import type * as sites from "../sites.js";
 
 import type {
   ApiFromModules,
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   profiles: typeof profiles;
   projects: typeof projects;
+  sites: typeof sites;
 }>;
 
 /**

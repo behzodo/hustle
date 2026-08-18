@@ -1,0 +1,29 @@
+{
+  // The Worker that serves every published client site.
+  //
+  //   npm run sites:deploy
+  //
+  // The route is a wildcard: one Worker answers for every subdomain, and
+  // publishing a new site is an upload to R2 rather than a deploy. That is the
+  // difference between adding a client in a second and adding one in a minute.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hustle-sites",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+  "routes": [
+    {
+      "pattern": "*.korvians.online/*",
+      "zone_name": "korvians.online"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SITES",
+      "bucket_name": "hustle-sites"
+    }
+  ],
+  "vars": {
+    "SITES_DOMAIN": "korvians.online"
+  }
+}

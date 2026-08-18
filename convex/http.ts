@@ -45,9 +45,142 @@ http.route({
       content: body.content,
       type: body.type,
       fragment: body.fragment,
+      bench: body.bench,
     });
 
     return Response.json({ messageId });
+  }),
+});
+
+/**
+ * The fast lane's three calls, for one lead's site.
+ *
+ * Separate routes rather than one because they happen at different moments and
+ * two of them can be the last thing that happens: read what is known, reserve
+ * the address, then say how it went. A build that dies between the second and
+ * the third leaves a lead marked "building" with an address held, which is
+ * exactly what a retry wants to find.
+ */
+http.route({
+  path: "/site/context",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const lead = await ctx.runQuery(internal.sites.leadForBuild, { leadId: body.leadId });
+
+    return Response.json({ lead });
+  }),
+});
+
+/**
+ * The queue's two calls: fill it, and take the next thing off it.
+ *
+ * Taking is a mutation rather than a query because it also claims — see
+ * `takeNext`. Two workers asking at the same moment must not be handed the
+ * same business.
+ */
+http.route({
+  path: "/site/queue",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    const result = await ctx.runMutation(internal.sites.queueProject, {
+      projectId: body.projectId,
+      rebuild: body.rebuild,
+    });
+
+    return Response.json(result);
+  }),
+});
+
+http.route({
+  path: "/site/next",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const next = await ctx.runMutation(internal.sites.takeNext, {
+      projectId: body.projectId,
+    });
+
+    return Response.json({ next });
+  }),
+});
+
+http.route({
+  path: "/site/claim",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    const site = await ctx.runMutation(internal.sites.claimForLead, {
+      leadId: body.leadId,
+      candidates: body.candidates,
+      domain: body.domain,
+    });
+
+    return Response.json(site);
+  }),
+});
+
+http.route({
+  path: "/site/result",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    if (body.error) {
+      await ctx.runMutation(internal.sites.failLead, {
+        leadId: body.leadId,
+        error: body.error,
+      });
+    } else {
+      await ctx.runMutation(internal.sites.recordLead, {
+        leadId: body.leadId,
+        slug: body.slug,
+        url: body.url,
+        template: body.template,
+      });
+    }
+
+    return Response.json({ ok: true });
+  }),
+});
+
+/**
+ * Claims the subdomain a project's site is published at.
+ *
+ * A separate call from `/agent/result` because it has to happen before the
+ * upload, not after: the files go into the bucket under the slug, so the name
+ * has to be settled while there is still time to fail cheaply.
+ */
+http.route({
+  path: "/agent/site",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const body = await request.json();
+
+    const site = await ctx.runMutation(internal.projects.claimSite, {
+      projectId: body.projectId,
+      candidates: body.candidates,
+      domain: body.domain,
+    });
+
+    return Response.json(site);
   }),
 });
 
@@ -61,12 +194,19 @@ http.route({
 
     const body = await request.json();
 
-    const messages = await ctx.runQuery(internal.messages.recentForAgent, {
-      projectId: body.projectId,
-      take: body.take,
-    });
+    // Both in one call. The build asks for context once, at the start, and
+    // the project's name is wanted at the other end of the run to derive the
+    // published address from — fetching it here costs nothing and saves a
+    // second round trip half an hour later.
+    const [messages, project] = await Promise.all([
+      ctx.runQuery(internal.messages.recentForAgent, {
+        projectId: body.projectId,
+        take: body.take,
+      }),
+      ctx.runQuery(internal.projects.basicsForAgent, { projectId: body.projectId }),
+    ]);
 
-    return Response.json({ messages });
+    return Response.json({ messages, project });
   }),
 });
 
