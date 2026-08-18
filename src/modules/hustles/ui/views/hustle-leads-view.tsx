@@ -6,6 +6,7 @@ import { describeEmptySweep } from "@/modules/hustles/discovery/lead";
 import { useHunt, useLeads } from "@/modules/hustles/use-discovery";
 import { ProjectSidebar } from "@/modules/projects/ui/components/project-sidebar";
 
+import { BuildTheatre } from "../components/build-theatre";
 import { HustlesBackdrop } from "../components/hustles-backdrop";
 import { LeadCard, type CardLead } from "../components/lead-card";
 
@@ -67,6 +68,11 @@ export const HustleLeadsView = ({ projectId }: { projectId: ProjectId }) => {
               </p>
             )}
           </div>
+
+          {/* Above the cards, because it is the thing that changes. The cards
+              are a list to browse; this is a run to watch, and it renders
+              nothing at all when the patch has no businesses to build. */}
+          <BuildTheatre projectId={projectId} />
 
           {leads === undefined ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

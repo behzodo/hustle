@@ -150,6 +150,7 @@ http.route({
         slug: body.slug,
         url: body.url,
         template: body.template,
+        build: body.build,
       });
     }
 

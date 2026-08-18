@@ -120,6 +120,18 @@ const leadShape = v.object({
       url: v.string(),
       template: v.string(),
       publishedAt: v.number(),
+      build: v.optional(
+        v.object({
+          provider: v.string(),
+          tokens: v.number(),
+          repairs: v.number(),
+          seconds: v.number(),
+          headline: v.string(),
+          services: v.array(v.string()),
+          problems: v.array(v.string()),
+          photo: v.optional(v.string()),
+        }),
+      ),
     }),
   ),
   siteStatus: v.optional(

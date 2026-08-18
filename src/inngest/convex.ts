@@ -112,10 +112,29 @@ export const claimLeadSite = (body: {
   domain: string;
 }) => call<{ slug: string; url: string }>("/site/claim", body);
 
+/** What one build did, kept so the screen can be opened up rather than read. */
+export interface BuildRecord {
+  provider: string;
+  tokens: number;
+  repairs: number;
+  seconds: number;
+  headline: string;
+  services: string[];
+  problems: string[];
+  photo?: string;
+}
+
 /** Says how it went. One shape for both outcomes so neither can be forgotten. */
 export const recordLeadSite = (
   body:
-    | { leadId: string; slug: string; url: string; template: string; error?: never }
+    | {
+        leadId: string;
+        slug: string;
+        url: string;
+        template: string;
+        build?: BuildRecord;
+        error?: never;
+      }
     | { leadId: string; error: string },
 ) => call<{ ok: boolean }>("/site/result", body);
 

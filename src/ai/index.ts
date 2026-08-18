@@ -28,6 +28,23 @@ export interface AskOptions extends Ask {
   order?: ProviderName[];
 }
 
+/**
+ * How long to wait when every provider is rate-limited, and how many times.
+ *
+ * A rate limit is not a failure, it is a queue. Cerebras allows five requests
+ * a minute and Groq's eight thousand tokens a minute works out at about four
+ * briefs — so a pool of workers exhausts all three buckets in seconds and then
+ * asks again a moment later, which is fine, as long as somebody waits.
+ *
+ * Nobody did, at first: the first run of a real patch failed sixty-four of
+ * seventy-three businesses, every one of them with a 429 that would have
+ * cleared inside a minute. The pauses below are the width of the window those
+ * limits are measured over.
+ */
+const RATE_LIMIT_WAITS_MS = [8000, 20000, 40000, 60000];
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const ask = async (options: AskOptions): Promise<Answer> => {
   const shops = providers();
   const order = (options.order ?? BULK_ORDER).filter((name) => shops[name].configured());
@@ -39,23 +56,43 @@ export const ask = async (options: AskOptions): Promise<Answer> => {
     );
   }
 
-  const failures: string[] = [];
+  let failures: string[] = [];
 
-  for (const name of order) {
-    try {
-      return await shops[name].ask(options);
-    } catch (cause) {
-      const error =
-        cause instanceof ProviderError
-          ? cause
-          : new ProviderError(String(cause), name, true);
+  for (let round = 0; round <= RATE_LIMIT_WAITS_MS.length; round++) {
+    failures = [];
+    let waitHint = 0;
+    let anyRateLimited = false;
 
-      failures.push(error.message);
+    for (const name of order) {
+      try {
+        return await shops[name].ask(options);
+      } catch (cause) {
+        const error =
+          cause instanceof ProviderError
+            ? cause
+            : new ProviderError(String(cause), name, true);
 
-      // A bad request is bad at every provider. Asking the other two the same
-      // malformed question spends three quotas to learn one thing.
-      if (!error.retryable) throw error;
+        failures.push(error.message);
+
+        // A bad request is bad at every provider. Asking the other two the
+        // same malformed question spends three quotas to learn one thing.
+        if (!error.retryable) throw error;
+
+        if (error.rateLimited) {
+          anyRateLimited = true;
+          waitHint = Math.max(waitHint, error.retryAfterMs ?? 0);
+        }
+      }
     }
+
+    // Everything that refused refused for some other reason — an outage, a
+    // model having a bad minute. Waiting does not help with those.
+    if (!anyRateLimited || round === RATE_LIMIT_WAITS_MS.length) break;
+
+    // Whichever is longer: what a provider actually asked for, or the backoff.
+    // Capped, because a provider that asks for an hour is telling us about a
+    // daily quota, and this call is not going to outlast it.
+    await pause(Math.min(Math.max(waitHint, RATE_LIMIT_WAITS_MS[round]), 90_000));
   }
 
   throw new Error(`Every provider refused:\n${failures.join("\n")}`);

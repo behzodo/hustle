@@ -103,20 +103,32 @@ export const claimForLead = internalMutation({
 });
 
 /** Marks a lead's site as live, once its files are actually in the bucket. */
+const buildRecord = v.object({
+  provider: v.string(),
+  tokens: v.number(),
+  repairs: v.number(),
+  seconds: v.number(),
+  headline: v.string(),
+  services: v.array(v.string()),
+  problems: v.array(v.string()),
+  photo: v.optional(v.string()),
+});
+
 export const recordLead = internalMutation({
   args: {
     leadId: v.id("leads"),
     slug: v.string(),
     url: v.string(),
     template: v.string(),
+    build: v.optional(buildRecord),
   },
   returns: v.null(),
-  handler: async (ctx, { leadId, slug, url, template }) => {
+  handler: async (ctx, { leadId, slug, url, template, build }) => {
     const lead = await ctx.db.get(leadId);
     if (!lead) return null;
 
     await ctx.db.patch(leadId, {
-      site: { slug, url, template, publishedAt: Date.now() },
+      site: { slug, url, template, publishedAt: Date.now(), build },
       siteStatus: "live",
       // Cleared rather than left behind: a lead that failed last night and
       // built this morning is not a lead with a problem.
@@ -384,5 +396,130 @@ export const startBuilds = mutation({
     }
 
     return await enqueue(ctx, projectId, rebuild);
+  },
+});
+
+/**
+ * What the build screen watches.
+ *
+ * Convex pushes this to every open tab whenever a lead changes, which is what
+ * makes the screen a window onto the run rather than a picture of it — the
+ * same reason the sweep is watchable. No polling, no socket to keep alive.
+ *
+ * Deliberately not the whole lead list. A patch is hundreds of businesses and
+ * the screen shows a handful: the ones being built right now, and the ones
+ * that just finished. Sending five hundred rows so that six can be displayed
+ * would push the rest of the payload out of the browser's way for nothing.
+ */
+export const feed = query({
+  args: { projectId: v.id("projects"), take: v.optional(v.number()) },
+  returns: v.object({
+    building: v.array(
+      v.object({
+        _id: v.id("leads"),
+        name: v.string(),
+        trade: v.string(),
+        score: v.number(),
+        startedAt: v.optional(v.number()),
+      }),
+    ),
+    recent: v.array(
+      v.object({
+        _id: v.id("leads"),
+        name: v.string(),
+        trade: v.string(),
+        url: v.string(),
+        template: v.string(),
+        publishedAt: v.number(),
+        phone: v.optional(v.string()),
+        rating: v.optional(v.number()),
+        reviewCount: v.optional(v.number()),
+        score: v.number(),
+        build: v.optional(buildRecord),
+      }),
+    ),
+    failed: v.array(
+      v.object({
+        _id: v.id("leads"),
+        name: v.string(),
+        error: v.optional(v.string()),
+      }),
+    ),
+    counts: v.object({
+      queued: v.number(),
+      building: v.number(),
+      live: v.number(),
+      failed: v.number(),
+      targets: v.number(),
+    }),
+  }),
+  handler: async (ctx, { projectId, take }) => {
+    const empty = {
+      building: [],
+      recent: [],
+      failed: [],
+      counts: { queued: 0, building: 0, live: 0, failed: 0, targets: 0 },
+    };
+
+    const userId = await requireUserId(ctx);
+    const project = await ctx.db.get(projectId);
+
+    if (!project || project.userId !== userId) return empty;
+
+    const leads = await ctx.db
+      .query("leads")
+      .withIndex("by_project_target_and_score", (q) =>
+        q.eq("projectId", projectId).eq("target", true),
+      )
+      .collect();
+
+    const limit = Math.min(Math.max(take ?? 6, 1), 24);
+    const count = (status: string) =>
+      leads.filter((lead) => lead.siteStatus === status).length;
+
+    return {
+      building: leads
+        .filter((lead) => lead.siteStatus === "building")
+        .map((lead) => ({
+          _id: lead._id,
+          name: lead.name,
+          trade: lead.categories[0] ?? "Local business",
+          score: lead.score,
+          startedAt: lead.siteStartedAt,
+        })),
+
+      // Newest first: the screen is a feed, and the interesting end of a feed
+      // is the end that just moved.
+      recent: leads
+        .filter((lead) => lead.siteStatus === "live" && lead.site)
+        .sort((a, b) => (b.site?.publishedAt ?? 0) - (a.site?.publishedAt ?? 0))
+        .slice(0, limit)
+        .map((lead) => ({
+          _id: lead._id,
+          name: lead.name,
+          trade: lead.categories[0] ?? "Local business",
+          url: lead.site?.url ?? "",
+          template: lead.site?.template ?? "",
+          publishedAt: lead.site?.publishedAt ?? 0,
+          phone: lead.phone,
+          rating: lead.rating,
+          reviewCount: lead.reviewCount,
+          score: lead.score,
+          build: lead.site?.build,
+        })),
+
+      failed: leads
+        .filter((lead) => lead.siteStatus === "failed")
+        .slice(0, limit)
+        .map((lead) => ({ _id: lead._id, name: lead.name, error: lead.siteError })),
+
+      counts: {
+        queued: count("queued"),
+        building: count("building"),
+        live: count("live"),
+        failed: count("failed"),
+        targets: leads.length,
+      },
+    };
   },
 });

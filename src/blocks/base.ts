@@ -98,13 +98,18 @@ a { color: inherit; }
 }
 .skip:focus { left: 0; }
 
-/* Revealed on scroll. Written so that the un-revealed state only exists where
-   the browser can undo it: without IntersectionObserver support, or with
-   JavaScript off, .reveal never gets its class and everything is simply
-   visible. A page that hides its own content when a script fails is not a
-   page. */
-.reveal { opacity: 0; transform: translateY(1.25rem); }
-.reveal.seen {
+/* Revealed on scroll — and only ever hidden where something can unhide it.
+
+   The hiding is scoped to a .js class that the inline script in render.ts
+   puts on <html> before the body is parsed. No script, no class, no hiding:
+   page renders complete. That is not a nicety. The first version hid these
+   unconditionally and unhid them from JavaScript, which meant every published
+   site showed its hero and nothing else to anybody with scripts off — and to
+   the dashboard's own preview tiles, which are sandboxed frames and therefore
+   run no script at all. A page that hides its own content when a script does
+   not run is not a page. */
+.js .reveal { opacity: 0; transform: translateY(1.25rem); }
+.js .reveal.seen {
   opacity: 1;
   transform: none;
   transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
@@ -113,7 +118,7 @@ a { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal, .reveal.seen { opacity: 1; transform: none; transition: none; }
+  .js .reveal, .js .reveal.seen { opacity: 1; transform: none; transition: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

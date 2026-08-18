@@ -60,17 +60,44 @@ export interface Answer {
   tokens: number;
 }
 
-/** Thrown when a provider will not answer. `retryable` says whether to move on. */
+/**
+ * Thrown when a provider will not answer.
+ *
+ * Two flags rather than one, because "try somebody else" and "try again later"
+ * are different instructions and the caller needs both. A 400 is neither: it
+ * is this request being wrong, and no amount of waiting or switching fixes it.
+ */
 export class ProviderError extends Error {
   constructor(
     message: string,
     readonly provider: ProviderName,
+    /** Worth handing to the next provider. */
     readonly retryable: boolean,
+    /** Worth asking this same provider again in a moment. */
+    readonly rateLimited = false,
+    /** What the provider asked us to wait, when it said. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ProviderError";
   }
 }
+
+/**
+ * How long a provider asked us to wait.
+ *
+ * `retry-after` is seconds by convention and both of these send it; Gemini
+ * also puts a `retryDelay` in the body, which is not read here because the
+ * body has already been consumed by the time this runs and a header that is
+ * usually present beats a second read that is always expensive.
+ */
+const waitFrom = (response: Response) => {
+  const header = response.headers.get("retry-after");
+  if (!header) return undefined;
+
+  const seconds = Number(header);
+  return Number.isFinite(seconds) ? seconds * 1000 : undefined;
+};
 
 interface Provider {
   name: ProviderName;
@@ -134,6 +161,8 @@ const openAiShaped = (
         `${name} answered ${response.status}: ${(await response.text()).slice(0, 200)}`,
         name,
         movesOn(response.status),
+        response.status === 429,
+        waitFrom(response),
       );
     }
 
@@ -221,6 +250,8 @@ export const gemini = (): Provider => ({
         `gemini answered ${response.status}: ${(await response.text()).slice(0, 200)}`,
         "gemini",
         movesOn(response.status),
+        response.status === 429,
+        waitFrom(response),
       );
     }
 

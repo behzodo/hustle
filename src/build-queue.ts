@@ -31,12 +31,21 @@ import { publishSite, slugCandidates } from "@/publish";
 /**
  * How many businesses are built at once.
  *
- * Bounded by the model's rate limits rather than by anything here: Cerebras
- * allows five requests a minute, so four in flight keeps a request spare for
- * the repair pass that a fifth of sites need. Raising this does not make the
- * queue faster, it makes it fail over to Groq more often.
+ * Bounded by the models, not by anything here, and the ceiling is lower than
+ * it looks. Cerebras allows five requests a minute; Groq's eight thousand
+ * tokens a minute works out at about four briefs. So the whole stack sustains
+ * roughly nine or ten model calls a minute however many workers ask.
+ *
+ * Three rather than four because past that the extra workers spend their time
+ * inside the backoff in src/ai — waiting is not throughput, it is just a
+ * longer queue with more places to wait in it. Three keeps every worker doing
+ * something most of the time and leaves room for the repair pass that about
+ * one site in five needs.
+ *
+ * The real number to watch is a minute's worth of calls, not a count of
+ * workers. Raise this when a provider's limit rises, not before.
  */
-export const WORKERS = 4;
+export const WORKERS = 3;
 
 export interface BuiltSite {
   leadId: string;
@@ -106,14 +115,34 @@ export const buildLeadSite = async (
   const { files } = renderSite(composed.content, { template, siteUrl: site.url });
 
   await publishSite(site.slug, files);
-  await recordLeadSite({ leadId, slug: site.slug, url: site.url, template });
+
+  const seconds = (Date.now() - started) / 1000;
+
+  // Rounded before it is stored. A number kept to fourteen decimal places is
+  // not more accurate, it is just harder to put on a screen.
+  await recordLeadSite({
+    leadId,
+    slug: site.slug,
+    url: site.url,
+    template,
+    build: {
+      provider: composed.provider,
+      tokens: composed.tokens,
+      repairs: composed.repairs,
+      seconds: Math.round(seconds * 10) / 10,
+      headline: composed.content.copy.headline,
+      services: composed.content.copy.services.map((service) => service.name),
+      problems: composed.problems.map((p) => `${p.field} — ${p.message}`),
+      photo: composed.photo ?? composed.photoSkipped,
+    },
+  });
 
   return {
     leadId,
     name: lead.name,
     url: site.url,
     template,
-    seconds: (Date.now() - started) / 1000,
+    seconds,
     tokens: composed.tokens,
     provider: composed.provider,
     repairs: composed.repairs,

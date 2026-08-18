@@ -24,6 +24,10 @@
     }
   ],
   "vars": {
-    "SITES_DOMAIN": "korvians.online"
+    "SITES_DOMAIN": "korvians.online",
+    // Who may show a client's site inside a frame. Only the dashboard: it
+    // previews every site it built as a live tile, and a tile is a frame.
+    // Anything not listed here still cannot embed these pages.
+    "PREVIEW_ORIGINS": "http://localhost:3000 http://app.localhost:3000 https://app.korvians.online https://korvians.online"
   }
 }

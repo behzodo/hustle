@@ -21,6 +21,21 @@ interface Env {
   SITES: R2Bucket;
   /** The domain sites are published under, e.g. "korvians.online". */
   SITES_DOMAIN: string;
+  /**
+   * Origins allowed to show these pages inside a frame, space separated.
+   *
+   * The dashboard previews every site it built as a live tile, which is a
+   * frame, which the old `X-Frame-Options: SAMEORIGIN` on this response
+   * forbade outright — every tile rendered as a blocked-content icon. The
+   * header was right to exist and wrong to be absolute.
+   *
+   * Replaced by `frame-ancestors`, which says the same thing with an
+   * exception: our own app may embed a client's site, and nobody else may.
+   * The two headers do not co-exist well — where both are sent, browsers
+   * honour the CSP and ignore the other — so the old one is gone rather than
+   * kept alongside.
+   */
+  PREVIEW_ORIGINS?: string;
 }
 
 /**
@@ -82,6 +97,16 @@ const slugFrom = (host: string, domain: string) => {
   return slug && !slug.includes(".") ? slug : null;
 };
 
+/**
+ * Who may frame a published site.
+ *
+ * `'self'` keeps a site able to frame its own pages. Everything after it is
+ * ours. A missing variable means nobody but the site itself, which is the safe
+ * way to be misconfigured.
+ */
+const frameAncestors = (env: Env) =>
+  `frame-ancestors 'self' ${env.PREVIEW_ORIGINS ?? ""}`.trim();
+
 const notFound = (message: string) =>
   new Response(
     `<!doctype html><meta charset="utf-8"><title>Not found</title>` +
@@ -118,11 +143,11 @@ export default {
           "content-type": typeFor(key),
           "cache-control": cacheFor(key),
           etag: object.httpEtag,
-          // These sites are built by a language model from a prompt. Nothing
-          // it writes should be able to open a frame around somebody else, and
-          // the content type it declares is the one it gets.
+          // These sites are built by a language model from a prompt, so the
+          // content type it declares is the one it gets, and who may wrap a
+          // frame around it is decided here rather than by whoever asks.
           "x-content-type-options": "nosniff",
-          "x-frame-options": "SAMEORIGIN",
+          "content-security-policy": frameAncestors(env),
         },
       });
     }
@@ -141,6 +166,8 @@ export default {
       headers: {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "public, max-age=0, must-revalidate",
+        "x-content-type-options": "nosniff",
+        "content-security-policy": frameAncestors(env),
       },
     });
   },

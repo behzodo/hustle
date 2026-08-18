@@ -228,6 +228,32 @@ export default defineSchema({
         // template that turns out to be wrong for a trade can be found again.
         template: v.string(),
         publishedAt: v.number(),
+        // What the robot did to get here.
+        //
+        // Kept because the page it produced is not the whole story and the
+        // rest of it is otherwise thrown away: which model wrote it, what the
+        // checks caught, whether it had to be corrected, what the photograph
+        // turned out to be. That is the difference between a screen that says
+        // a site exists and one that can be opened up and understood — and it
+        // is the only record of a check having fired, since the fix lands in
+        // the copy and leaves no trace there.
+        //
+        // Optional: every site built before this was stored has none.
+        build: v.optional(
+          v.object({
+            provider: v.string(),
+            tokens: v.number(),
+            repairs: v.number(),
+            seconds: v.number(),
+            headline: v.string(),
+            services: v.array(v.string()),
+            // What the checker caught, in its own words. Empty is the normal
+            // case and is worth showing as much as a full one.
+            problems: v.array(v.string()),
+            // What the photograph was judged to be, or why it was not used.
+            photo: v.optional(v.string()),
+          }),
+        ),
       }),
     ),
     // Where this lead is in the build queue. Absent means never queued —

@@ -152,6 +152,10 @@ export const renderSite = (
     siteUrl ? `<meta property="og:url" content="${url(siteUrl)}">` : "",
     business.photo ? `<meta property="og:image" content="${url(business.photo)}">` : "",
     `<meta name="twitter:card" content="${business.photo ? "summary_large_image" : "summary"}">`,
+    // Before the stylesheet, and before the body exists. This is what makes
+    // the scroll reveal safe: the rule that hides a section is scoped to this
+    // class, so a browser that never runs it renders everything.
+    `<script>document.documentElement.className='js'</script>`,
     `<style>${tightenCss(BASE_CSS + css)}</style>`,
   ]
     .filter(Boolean)
