@@ -318,9 +318,20 @@ const STAGES: Stage[] = [
 export const HowItWorks = ({
   projectId,
   className,
+  startAt = "hunt",
 }: {
   projectId: ProjectId;
   className?: string;
+  /**
+   * Which act the loop opens on.
+   *
+   * The first showing starts at the hunt, because the hunt is what is actually
+   * happening. When the frame comes back after the wall has been filed away
+   * the hunt is finished and re-enacting it would be the screen miming work it
+   * already did — so that showing opens on the build, which is the step the
+   * user is now one prompt away from.
+   */
+  startAt?: Phase;
 }) => {
   const theme = useCurrentTheme();
   const still = Boolean(useReducedMotion());
@@ -349,7 +360,7 @@ export const HowItWorks = ({
     [pins],
   );
 
-  const [phase, setPhase] = useState<Phase>("hunt");
+  const [phase, setPhase] = useState<Phase>(startAt);
   const [cycle, setCycle] = useState(0);
 
   // A project made before the wizard existed has no patch to sweep, so its

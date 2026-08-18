@@ -33,14 +33,15 @@ export const useHunt = (projectId: ProjectId) => {
  * website included — the denominator behind "41 of 260".
  */
 export const useLeads = (
-  projectId: ProjectId,
+  /** Null when no hustle is picked — the businesses wall filters by chip. */
+  projectId: ProjectId | null,
   { limit, includeCovered }: { limit?: number; includeCovered?: boolean } = {},
 ) => {
   const { isAuthenticated } = useConvexAuth();
 
   return useQuery(
     api.discovery.leads,
-    isAuthenticated
+    isAuthenticated && projectId !== null
       ? {
           projectId,
           ...(limit === undefined ? {} : { limit }),

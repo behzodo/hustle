@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { Ref } from "react";
 import {
   FolderSimpleIcon,
   HammerIcon,
@@ -56,8 +58,30 @@ const Brand = ({ name }: { name?: string }) => {
   );
 };
 
-export const ProjectSidebar = ({ projectId }: { projectId: ProjectId }) => {
+/**
+ * Where this hustle's businesses live — the drawer the lead wall files into.
+ *
+ * Scoped to the hustle, not the gallery: the cards are what the sweep produced
+ * here, so the icon they fly into has to be the icon that opens them.
+ */
+export const filedHref = (projectId: ProjectId) => `/hustles/${projectId}`;
+
+export const ProjectSidebar = ({
+  projectId,
+  fileRef,
+}: {
+  projectId: ProjectId;
+  /**
+   * Handle on the "Building" icon.
+   *
+   * The lead wall flies its businesses into this glyph when it has finished
+   * with them, which only works if something outside the rail can find out
+   * where the glyph currently is. See lead-wall.tsx.
+   */
+  fileRef?: Ref<HTMLSpanElement>;
+}) => {
   const project = useProject(projectId);
+  const pathname = usePathname();
 
   const links: HoverSidebarLinkItem[] = [
     {
@@ -66,8 +90,11 @@ export const ProjectSidebar = ({ projectId }: { projectId: ProjectId }) => {
       icon: <HammerIcon className="size-5" />,
     },
     {
-      label: "Your hustles",
-      href: "/hustles",
+      // Named for what it holds rather than where it goes. Inside a hustle
+      // this is the drawer the lead wall files its businesses into, and the
+      // gallery it opens is the next thing you build from.
+      label: "Building",
+      href: filedHref(projectId),
       icon: <FolderSimpleIcon className="size-5" />,
     },
     {
@@ -98,7 +125,20 @@ export const ProjectSidebar = ({ projectId }: { projectId: ProjectId }) => {
               <HoverSidebarLink
                 key={link.href}
                 link={link}
-                active={link.href === `/projects/${projectId}`}
+                // Marked off the live path rather than a hardcoded route, so
+                // Building lights up when you are reading the businesses and
+                // This hustle when you are on the build.
+                //
+                // The endsWith is for the app subdomain: every href here is
+                // written without the /app prefix the middleware rewrites to,
+                // and which of the two paths reaches this hook is not worth
+                // depending on.
+                active={
+                  pathname === link.href || pathname.endsWith(link.href)
+                }
+                iconRef={
+                  link.href === filedHref(projectId) ? fileRef : undefined
+                }
               />
             ))}
           </nav>

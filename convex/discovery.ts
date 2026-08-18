@@ -76,6 +76,7 @@ const huntShape = v.object({
   cursor: v.number(),
   scanned: v.number(),
   found: v.number(),
+  outside: v.optional(v.number()),
   requests: v.number(),
   startedAt: v.number(),
   finishedAt: v.optional(v.number()),
@@ -103,6 +104,7 @@ const leadShape = v.object({
   rating: v.optional(v.number()),
   reviewCount: v.optional(v.number()),
   categories: v.array(v.string()),
+  photo: v.optional(v.string()),
   score: v.number(),
   term: v.string(),
 });
@@ -119,6 +121,7 @@ const findShape = v.object({
   rating: v.optional(v.number()),
   reviewCount: v.optional(v.number()),
   categories: v.array(v.string()),
+  photo: v.optional(v.string()),
   term: v.string(),
   // Absent for the Google-shaped providers, where a blank website means the
   // owner has none. False from OpenStreetMap, where it means nobody said.
@@ -188,6 +191,7 @@ export const start = mutation({
       cursor: 0,
       scanned: 0,
       found: 0,
+      outside: 0,
       requests: 0,
       startedAt: Date.now(),
       gl: countryFor(project.area.label),
@@ -337,6 +341,7 @@ export const absorb = internalMutation({
 
     let scanned = 0;
     let found = 0;
+    let outside = 0;
 
     // The same shop comes back on both pages of a search and again under the
     // next term. Within one batch that is caught here; across batches, by the
@@ -349,7 +354,15 @@ export const absorb = internalMutation({
 
       // Google answers a viewport, not a shape. Without this a patch drawn
       // around one neighbourhood fills up with the next town over.
-      if (area !== undefined && !withinArea(area, find)) continue;
+      //
+      // Counted on the way past rather than dropped silently: a sweep that
+      // rejects everything it was given and a sweep that was given nothing
+      // both end at zero leads, and the user has to fix a different thing in
+      // each case.
+      if (area !== undefined && !withinArea(area, find)) {
+        outside += 1;
+        continue;
+      }
 
       const verdict = readWebsite(find.website, find.websiteKnown ?? true);
 
@@ -366,6 +379,7 @@ export const absorb = internalMutation({
         ...(find.rating === undefined ? {} : { rating: find.rating }),
         ...(find.reviewCount === undefined ? {} : { reviewCount: find.reviewCount }),
         categories: find.categories,
+        ...(find.photo === undefined ? {} : { photo: find.photo }),
         score: scoreLead({
           presence: verdict.presence,
           reviewCount: find.reviewCount,
@@ -406,6 +420,11 @@ export const absorb = internalMutation({
       cursor,
       scanned: hunt.scanned + scanned,
       found: hunt.found + found,
+      // Absent on every hunt from before this was counted, which is not the
+      // same as zero — but treating it as zero only understates a number that
+      // is there to explain an empty screen, and those hunts have no screen
+      // left to explain.
+      outside: (hunt.outside ?? 0) + outside,
       requests: hunt.requests + requests,
     });
 

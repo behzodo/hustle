@@ -48,19 +48,38 @@ const HustleCard = ({
   updatedAt: Date;
 }) => (
   <div className="group relative flex flex-col">
-    <Link href={`/projects/${id}`} className="flex flex-col">
-      {/* No name plate over the top: the miniature is the picture, and the
-          name is already set directly under the card. */}
-      <div className="relative aspect-video overflow-hidden rounded-2xl border transition-transform duration-300 group-hover:-translate-y-1">
-        <HustleCover name={name} className="absolute inset-0" />
-      </div>
-      <div className="px-1 pt-3">
-        <p className="truncate text-sm font-medium">{name}</p>
-        <p className="text-muted-foreground text-sm">
+    {/* No name plate over the top: the miniature is the picture, and the
+        name is already set directly under the card. */}
+    <Link
+      href={`/projects/${id}`}
+      className="focus-visible:ring-ring relative aspect-video overflow-hidden rounded-2xl border transition-transform duration-300 outline-none group-hover:-translate-y-1 focus-visible:ring-2"
+    >
+      <HustleCover name={name} className="absolute inset-0" />
+    </Link>
+
+    {/* Two destinations, so they cannot share one link: the cover opens the
+        build, and the businesses this hustle found are their own screen. */}
+    <div className="px-1 pt-3">
+      <Link
+        href={`/projects/${id}`}
+        className="block truncate text-sm font-medium underline-offset-4 hover:underline"
+      >
+        {name}
+      </Link>
+
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-muted-foreground truncate text-sm">
           Edited {formatDistanceToNow(updatedAt, { addSuffix: true })}
         </p>
+
+        <Link
+          href={`/hustles/${id}`}
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring shrink-0 rounded-sm text-sm underline-offset-4 transition-colors outline-none hover:underline focus-visible:ring-2"
+        >
+          Businesses
+        </Link>
       </div>
-    </Link>
+    </div>
 
     {/* Rides the same lift as the cover so it stays pinned to the corner.
         Transparent to the cursor, or it would swallow every click meant for
@@ -125,6 +144,7 @@ export const HustlesView = () => {
             />
           ))}
         </div>
+
       </div>
     </div>
   );

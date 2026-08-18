@@ -199,6 +199,44 @@ const SOCIAL_LABELS: Record<SocialKind, string> = {
 };
 
 /**
+ * Why a finished sweep has nothing to pitch.
+ *
+ * There are four ways to end up looking at an empty patch and they need four
+ * different things done about them, so they cannot share a sentence. The one
+ * that matters most is the third: a sweep that returned plenty and threw all
+ * of it away is not a patch with no businesses, it is a patch in the wrong
+ * place — and the two look identical from the outside. Key Largo's postcode
+ * takes in most of Everglades National Park, so its centre is about eighty
+ * kilometres out to sea; a hustle seeded there searched water, discarded every
+ * result for being too far away, and told its owner the town was empty.
+ *
+ * `outside` is absent on sweeps from before it was counted, which reads here
+ * as zero — those fall back to the old wording rather than claiming a number
+ * that was never recorded.
+ */
+export const describeEmptySweep = (
+  hunt: { status: string; scanned: number; outside?: number } | null,
+) => {
+  if (hunt === null) return "No sweep has run on this patch yet.";
+
+  if (hunt.scanned > 0) {
+    return `Every business in this patch already has a website. ${hunt.scanned} swept, none to pitch.`;
+  }
+
+  const rejected = hunt.outside ?? 0;
+
+  if (rejected > 0) {
+    return `Google answered with ${rejected} result${rejected === 1 ? "" : "s"}, and every one of them sat outside your patch. That usually means the middle of the patch is not where its name suggests — a pin dropped in open water, or a postcode whose centre is miles from the town it is named after. Move it over a town, or widen it.`;
+  }
+
+  if (hunt.status === "failed") {
+    return "The sweep stopped before it found anything.";
+  }
+
+  return "Google returned nothing at all for this patch. Try a wider one, or one over a town.";
+};
+
+/**
  * The one-line reason this business is on the list.
  *
  * `socialKind` is typed loosely because it comes back off a stored row as a

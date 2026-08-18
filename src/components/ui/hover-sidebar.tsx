@@ -161,10 +161,20 @@ export const HoverSidebarLink = ({
   link,
   active,
   className,
+  iconRef,
 }: {
   link: HoverSidebarLinkItem;
   active?: boolean;
   className?: string;
+  /**
+   * Handle on the icon itself, for anything that needs to point at this link
+   * from elsewhere on the screen.
+   *
+   * The icon rather than the whole row on purpose: the row is 260px wide when
+   * the rail is open and 40px when it is shut, so something aiming at its
+   * centre would move whenever a cursor passed nearby. The glyph does not.
+   */
+  iconRef?: React.Ref<HTMLSpanElement>;
 }) => {
   const { open, animate } = useHoverSidebar();
 
@@ -182,7 +192,7 @@ export const HoverSidebarLink = ({
         className,
       )}
     >
-      <span className="grid size-5 shrink-0 place-items-center">
+      <span ref={iconRef} className="grid size-5 shrink-0 place-items-center">
         {link.icon}
       </span>
 

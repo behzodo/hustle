@@ -105,6 +105,19 @@ export default defineSchema({
     scanned: v.number(),
     // Of those, the ones with no website of their own.
     found: v.number(),
+    // Listings Google returned that fell *outside* it, and were discarded.
+    //
+    // Kept because it is the difference between the two ways a sweep comes
+    // back empty, and they need opposite fixes: nothing here means the search
+    // found nothing at all, while a large number means the search worked and
+    // the patch is in the wrong place — a pin in open water, or a postcode
+    // centroid sitting eighty kilometres from the town it is named after.
+    // Without it both read as "your town has no businesses".
+    //
+    // Sightings rather than distinct businesses: a shop rejected under three
+    // search terms in three different batches counts three times, because
+    // nothing outside the patch is stored to dedupe against.
+    outside: v.optional(v.number()),
     // Billed Scrape.do requests so far. The bill, in plain sight.
     requests: v.number(),
     startedAt: v.number(),
@@ -152,6 +165,15 @@ export default defineSchema({
     reviewCount: v.optional(v.number()),
     // Google's own categories, e.g. ["Hair salon", "Barber shop"].
     categories: v.array(v.string()),
+    // A picture of the place, on Google's CDN. Came free with the search that
+    // found it — see MapsPlace.photo.
+    //
+    // The URL is stored rather than the image. Copying a few hundred thumbnails
+    // per sweep into file storage would make a sweep slower and heavier for a
+    // picture the user may look at once. The cost is that these URLs carry a
+    // token and can eventually stop resolving, so the card treats a photo as
+    // something that might not load rather than something that will.
+    photo: v.optional(v.string()),
     // 0–100, worth-pitching-ness. See scoreLead().
     score: v.number(),
     // The search phrase that turned it up, so a surprising lead can be
@@ -164,6 +186,11 @@ export default defineSchema({
     // Everything found, best first — the denominator view.
     .index("by_project_and_score", ["projectId", "score"])
     // The working list: only the businesses with a gap, best first.
+    //
+    // There is deliberately no `userId` equivalent. Every screen that reads
+    // leads reads one hustle's, because a score only ranks businesses against
+    // others in the same patch — and an index nobody queries is still written
+    // on every insert.
     .index("by_project_target_and_score", ["projectId", "target", "score"]),
 
   fragments: defineTable({

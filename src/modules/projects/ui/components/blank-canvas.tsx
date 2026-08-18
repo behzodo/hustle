@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { cn } from "@/lib/utils";
@@ -16,17 +16,23 @@ import { ProjectBackdrop } from "./project-backdrop";
 /**
  * A hustle that has never been built.
  *
- * The screen has two states and it moves between them once. While the patch
- * is being swept it shows the loop the product runs, with the discover act
- * drawing the sweep that is actually happening. When the sweep finishes the
- * whole explainer leaves and the businesses it found take the canvas.
+ * The screen runs the product's own loop once, in order, and each scene leaves
+ * when it has nothing left to say:
+ *
+ *   sweeping   the explainer, with the discover act drawing the real sweep
+ *   swept      the wall of businesses it found, cut down to the shortlist
+ *   filed      the shortlist flies into the rail, and the explainer comes back
+ *              on the build act — the step the user is now one prompt away from
  *
  * That order is the argument. An explainer that stayed up next to the results
- * would be a diagram competing with the thing it described; the results are
- * the thing, so at the moment they exist the diagram has no job left.
+ * would be a diagram competing with the thing it described, so it goes when
+ * the businesses arrive. It returns only once they have been put away, by
+ * which point it is no longer explaining the sweep — it is showing what the
+ * next prompt does.
  *
  * The sidebar is the way back out; without it this screen is a dead end with
- * no navigation at all.
+ * no navigation at all. It is also where the leads are filed, which is the
+ * other reason it cannot be left off.
  */
 export const BlankCanvas = ({ projectId }: { projectId: ProjectId }) => {
   const still = Boolean(useReducedMotion());
@@ -61,11 +67,19 @@ export const BlankCanvas = ({ projectId }: { projectId: ProjectId }) => {
   const loading = hunt === undefined || project === undefined;
   const swept = !loading && hunt !== null && hunt.status !== "running";
 
+  const [filed, setFiled] = useState(false);
+  const onFiled = useCallback(() => setFiled(true), []);
+
+  const stage = loading ? null : !swept ? "explainer" : filed ? "build" : "wall";
+
+  /** Where the wall throws its shortlist when it is done with it. */
+  const fileRef = useRef<HTMLSpanElement>(null);
+
   // The container's layout has to follow whichever child is mounted, and with
-  // `mode="wait"` the wall does not mount until the explainer has finished
-  // leaving. Flipping on `swept` alone would yank the frame to the top of the
-  // screen while it was still fading out.
-  const [wallLayout, setWallLayout] = useState(false);
+  // `mode="wait"` the next scene does not mount until the last has finished
+  // leaving. Flipping on the stage alone would yank the frame to the top of
+  // the screen while the explainer was still fading out.
+  const [topAligned, setTopAligned] = useState(false);
   const settled = useRef(false);
 
   useEffect(() => {
@@ -74,38 +88,49 @@ export const BlankCanvas = ({ projectId }: { projectId: ProjectId }) => {
 
     // Re-opening a hustle that was swept in an earlier session: there is no
     // explainer to fade, so the wall takes the layout straight away.
-    if (swept) setWallLayout(true);
+    if (swept) setTopAligned(true);
   }, [loading, swept]);
 
   return (
     <div className="bg-background flex h-screen w-full flex-col md:flex-row">
-      <ProjectSidebar projectId={projectId} />
+      <ProjectSidebar projectId={projectId} fileRef={fileRef} />
 
-      {/* The backdrop belongs to the explainer, not the screen. Once the wall
+      {/* The backdrop belongs to the explainer, not the screen. While the wall
           is up the canvas is nothing but the sidebar and the businesses. */}
       <main
         className={cn(
           "relative flex flex-1 overflow-y-auto p-6 md:p-10",
-          wallLayout ? "items-start justify-start" : "items-center justify-center",
+          topAligned ? "items-start justify-start" : "items-center justify-center",
         )}
       >
-        {!wallLayout && <ProjectBackdrop />}
+        {!topAligned && <ProjectBackdrop />}
 
-        <AnimatePresence mode="wait" onExitComplete={() => setWallLayout(true)}>
-          {loading ? null : swept ? (
+        <AnimatePresence
+          mode="wait"
+          onExitComplete={() => setTopAligned(stage === "wall")}
+        >
+          {stage === null ? null : stage === "wall" ? (
             <motion.div
               key="wall"
               className="relative w-full"
               initial={still ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <LeadWall projectId={projectId} areaLabel={project?.area?.label} />
+              <LeadWall
+                projectId={projectId}
+                areaLabel={project?.area?.label}
+                fileRef={fileRef}
+                onFiled={onFiled}
+              />
             </motion.div>
           ) : (
             <motion.div
-              key="explainer"
+              key={stage}
               className="relative"
+              initial={still ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
               // Not a plain fade: the frame pulls back and softens, so the
               // explainer reads as being put away rather than switched off.
               exit={
@@ -113,9 +138,15 @@ export const BlankCanvas = ({ projectId }: { projectId: ProjectId }) => {
                   ? { opacity: 0 }
                   : { opacity: 0, scale: 0.94, filter: "blur(10px)" }
               }
-              transition={{ duration: 0.55, ease: [0.4, 0, 1, 1] }}
+              transition={{ duration: stage === "build" ? 0.45 : 0.55, ease: [0.4, 0, 1, 1] }}
             >
-              <HowItWorks projectId={projectId} />
+              {/* Coming back after the leads have been filed, the sweep is
+                  finished and re-enacting it would be the screen miming work
+                  it already did — so this showing opens on the build. */}
+              <HowItWorks
+                projectId={projectId}
+                startAt={stage === "build" ? "build" : "hunt"}
+              />
             </motion.div>
           )}
         </AnimatePresence>
