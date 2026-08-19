@@ -1,10 +1,14 @@
 "use client";
 
+import { Suspense } from "react";
+
 import type { ProjectId } from "@/modules/projects/types";
 import { useProject } from "@/modules/projects/use-projects";
 import { describeEmptySweep } from "@/modules/hustles/discovery/lead";
 import { useHunt, useLeads } from "@/modules/hustles/use-discovery";
 import { ProjectSidebar } from "@/modules/projects/ui/components/project-sidebar";
+
+import { DomainReturnToast } from "@/modules/domains/ui/domain-return-toast";
 
 import { BuildTheatre } from "../components/build-theatre";
 import { HustlesBackdrop } from "../components/hustles-backdrop";
@@ -39,6 +43,13 @@ export const HustleLeadsView = ({ projectId }: { projectId: ProjectId }) => {
 
   return (
     <div className="bg-background flex h-screen w-full flex-col md:flex-row">
+      {/* Suspended because it reads the query string, which opts the route
+          into client rendering unless the boundary is here. It renders
+          nothing, so there is nothing to fall back to. */}
+      <Suspense fallback={null}>
+        <DomainReturnToast />
+      </Suspense>
+
       <ProjectSidebar projectId={projectId} />
 
       <main className="relative flex-1 overflow-y-auto">

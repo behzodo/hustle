@@ -10,6 +10,7 @@ import {
 } from "./_generated/server";
 import { huntQueryValidator, webPresence } from "./schema";
 import { requireOwnedProject, requireUserId } from "./lib/auth";
+import { CREDIT_COSTS, refund, spend } from "./credits";
 import { leadFields } from "./schema";
 import { PlacesError, provider, searchPlaces } from "./lib/places";
 import {
@@ -176,6 +177,22 @@ export const start = mutation({
         message: "There is nothing to search in that patch.",
       });
     }
+
+    // Charged here, once, for the whole plan — not per search.
+    //
+    // A sweep is the only step that spends real money at a rate we do not
+    // control: up to ninety-six billed pages at a scraper's price. Taking it
+    // upfront is also what makes the refund below possible, and what stops a
+    // patch being half-swept on an empty balance.
+    //
+    // After the duplicate-hunt check above, so a double-clicked button returns
+    // the running hunt without being billed a second time. Before the insert,
+    // so a caller who cannot afford it gets no hunt row at all — the throw
+    // rolls the transaction back, schedule and all.
+    await spend(ctx, userId, "sweep", {
+      projectId,
+      note: project.area.label,
+    });
 
     const huntId = await ctx.db.insert("hunts", {
       projectId,
@@ -452,6 +469,23 @@ export const fail = internalMutation({
       // a whole HTML page.
       error: error.slice(0, 300),
     });
+
+    // A sweep that fell over before it found anything is a sweep the user did
+    // not get. The credits go back.
+    //
+    // Only when the count is zero, and deliberately not pro-rated below that:
+    // a hunt that died on its fortieth query with two hundred businesses in
+    // the bag delivered the thing that was paid for, and working out what
+    // fraction of a patch is worth what fraction of ten credits is an argument
+    // nobody wins. All or nothing is a rule a user can predict.
+    if (hunt.scanned === 0) {
+      await refund(
+        ctx,
+        hunt.userId,
+        CREDIT_COSTS.sweep,
+        "Sweep failed before it found anything",
+      );
+    }
 
     return null;
   },

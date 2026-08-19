@@ -4,7 +4,25 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { requireOwnedProject, requireUserId } from "./lib/auth";
+import { spend } from "./credits";
+import { claimSendSlot, credentialsValidator, senderShape } from "./mailboxes";
 import { pitchStatus } from "./schema";
+
+/**
+ * A mailbox, as the reply poller needs one.
+ *
+ * `senderShape` without the id, because reading a conversation does not need
+ * to know which row it came from — and because a pitch sent before mailboxes
+ * existed has no row to name, only a Gmail connection on the profile. Keeping
+ * the id out is what lets both answer the same question.
+ */
+const readerShape = v.object({
+  provider: v.union(v.literal("gmail"), v.literal("infraforge")),
+  email: v.string(),
+  name: v.optional(v.string()),
+  connectionId: v.optional(v.string()),
+  credentials: v.optional(credentialsValidator),
+});
 
 /**
  * The pitch lane, from the database's side.
@@ -235,6 +253,28 @@ export const saveDraft = internalMutation({
       return existing._id;
     }
 
+    // Charged for a draft somebody can actually send, and only the first time
+    // one appears.
+    //
+    // Three cases are deliberately free. A blocked draft is not a pitch — the
+    // checker refused it and there is nothing to send — so the model call is
+    // absorbed rather than billed to a user who got nothing. Re-drafting over
+    // a draft that is already good is the queue being run twice, not a second
+    // piece of work. And sending, later, is free: the credit was taken when
+    // the words were written, which is the part that costs.
+    //
+    // That leaves exactly one billable event per business: the first usable
+    // draft, or the one that finally works after a blocked attempt.
+    const firstUsableDraft =
+      !blocked && (existing === null || existing.status === "failed");
+
+    if (firstUsableDraft) {
+      await spend(ctx, lead.userId, "pitch", {
+        projectId: lead.projectId,
+        note: lead.name,
+      });
+    }
+
     const fields = {
       to,
       subject,
@@ -363,8 +403,7 @@ export const takeNext = internalMutation({
       to: v.string(),
       subject: v.string(),
       body: v.string(),
-      connectionId: v.string(),
-      from: v.string(),
+      sender: senderShape,
     }),
     v.null(),
   ),
@@ -399,24 +438,42 @@ export const takeNext = internalMutation({
       return null;
     }
 
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", next.userId))
-      .first();
+    // The rotation, not the profile. Claimed inside this same mutation so the
+    // allowance and the pitch move together: a crash between them would
+    // otherwise spend a mailbox's slot on a pitch still sitting queued, and
+    // the day's ceiling would drift down every time a worker died.
+    const sender = await claimSendSlot(ctx, next.userId);
 
-    if (!profile?.gmailConnectionId || !profile.gmailEmail) {
-      // No inbox to send from. Failed rather than left queued, so the screen
-      // says why instead of showing a queue that never moves.
-      await ctx.db.patch(next._id, {
-        status: "failed",
-        error: "No Gmail account is connected. Connect one on the connections screen.",
-        updatedAt: now,
-      });
+    if (!sender) {
+      // Two different situations, and they need different sentences. No
+      // mailbox at all is a setup step; every mailbox at its ceiling is a
+      // schedule, and telling somebody their queue has "failed" when it is
+      // simply finished for today is how a working product reads as broken.
+      const owned = await ctx.db
+        .query("mailboxes")
+        .withIndex("by_user", (q) => q.eq("userId", next.userId))
+        .take(1);
 
+      if (owned.length === 0) {
+        await ctx.db.patch(next._id, {
+          status: "failed",
+          error:
+            "No mailbox to send from. Add one on the connections screen, or connect a Google account.",
+          updatedAt: now,
+        });
+      }
+
+      // Left queued when they simply have none left today — the next run
+      // picks it up, and the queue is a queue rather than a pile of failures.
       return null;
     }
 
-    await ctx.db.patch(next._id, { status: "sending", startedAt: now, updatedAt: now });
+    await ctx.db.patch(next._id, {
+      status: "sending",
+      mailboxId: sender.mailboxId,
+      startedAt: now,
+      updatedAt: now,
+    });
 
     return {
       pitchId: next._id,
@@ -424,8 +481,7 @@ export const takeNext = internalMutation({
       to: next.to,
       subject: next.subject,
       body: next.body,
-      connectionId: profile.gmailConnectionId,
-      from: profile.gmailEmail,
+      sender,
     };
   },
 });
@@ -785,6 +841,10 @@ export const awaitingReply = internalQuery({
         priceBand: v.optional(v.string()),
         stripeAccountId: v.optional(v.string()),
       }),
+      // Which mailbox to look in. Null when there is nothing to look with —
+      // an old pitch whose Gmail connection has since been removed — and the
+      // poller skips those rather than failing the whole sweep for one.
+      mailbox: v.union(readerShape, v.null()),
     }),
   ),
   handler: async (ctx, { projectId }) => {
@@ -811,20 +871,69 @@ export const awaitingReply = internalQuery({
       stripeAccountId: profile?.stripeAccountId,
     };
 
-    return open.map((pitch) => ({
-      pitchId: pitch._id,
-      threadId: pitch.gmail!.threadId,
-      // How many messages we already know about, so the poller can tell a
-      // thread that has moved from one that has not without re-reading it.
-      known: pitch.thread.length,
-      to: pitch.to,
-      subject: pitch.subject,
-      business: pitch.business,
-      siteUrl: pitch.siteUrl,
-      rfcId: pitch.gmail!.rfcId,
-      invoiced: Boolean(pitch.invoice),
-      sender,
-    }));
+    /**
+     * The mailbox each conversation lives in.
+     *
+     * Cached, because a hundred open pitches across four mailboxes is four
+     * reads rather than a hundred — and this query runs once a minute for
+     * every hustle with anything outstanding.
+     */
+    const mailboxes = new Map<string, typeof readerShape.type | null>();
+
+    const readerFor = async (pitch: Doc<"pitches">) => {
+      // The old world: sent before mailboxes existed, out of the one Gmail
+      // account on the profile. Still readable, so still read.
+      if (!pitch.mailboxId) {
+        return profile?.gmailConnectionId && profile.gmailEmail
+          ? {
+              provider: "gmail" as const,
+              email: profile.gmailEmail,
+              connectionId: profile.gmailConnectionId,
+            }
+          : null;
+      }
+
+      const key = pitch.mailboxId;
+      const cached = mailboxes.get(key);
+      if (cached !== undefined) return cached;
+
+      const mailbox = await ctx.db.get(pitch.mailboxId);
+
+      const reader = mailbox
+        ? {
+            provider: mailbox.provider,
+            email: mailbox.email,
+            name: mailbox.name,
+            connectionId: mailbox.connectionId,
+            credentials: mailbox.credentials,
+          }
+        : null;
+
+      mailboxes.set(key, reader);
+      return reader;
+    };
+
+    const rows = [];
+
+    for (const pitch of open) {
+      rows.push({
+        pitchId: pitch._id,
+        threadId: pitch.gmail!.threadId,
+        // How many messages we already know about, so the poller can tell a
+        // thread that has moved from one that has not without re-reading it.
+        known: pitch.thread.length,
+        to: pitch.to,
+        subject: pitch.subject,
+        business: pitch.business,
+        siteUrl: pitch.siteUrl,
+        rfcId: pitch.gmail!.rfcId,
+        invoiced: Boolean(pitch.invoice),
+        sender,
+        mailbox: await readerFor(pitch),
+      });
+    }
+
+    return rows;
   },
 });
 
@@ -876,12 +985,7 @@ export const recordInvoice = internalMutation({
 export const openMailboxes = internalQuery({
   args: {},
   returns: v.array(
-    v.object({
-      userId: v.string(),
-      projectId: v.id("projects"),
-      connectionId: v.string(),
-      email: v.string(),
-    }),
+    v.object({ userId: v.string(), projectId: v.id("projects") }),
   ),
   handler: async (ctx) => {
     const open = await ctx.db
@@ -890,32 +994,19 @@ export const openMailboxes = internalQuery({
       .order("desc")
       .take(500);
 
+    // Just the hustles with something outstanding. Which mailbox to read each
+    // conversation in is no longer a property of the project — with a rotation
+    // there are several, and the answer is per pitch — so that resolution has
+    // moved into `open` below, and this is only the list of doors to knock on.
     const seen = new Set<string>();
-    const out: {
-      userId: string;
-      projectId: Id<"projects">;
-      connectionId: string;
-      email: string;
-    }[] = [];
+    const out: { userId: string; projectId: Id<"projects"> }[] = [];
 
     for (const pitch of open) {
       const key = `${pitch.userId}:${pitch.projectId}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", pitch.userId))
-        .first();
-
-      if (!profile?.gmailConnectionId || !profile.gmailEmail) continue;
-
-      out.push({
-        userId: pitch.userId,
-        projectId: pitch.projectId,
-        connectionId: profile.gmailConnectionId,
-        email: profile.gmailEmail,
-      });
+      out.push({ userId: pitch.userId, projectId: pitch.projectId });
     }
 
     return out;

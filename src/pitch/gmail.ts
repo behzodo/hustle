@@ -3,6 +3,7 @@ import "server-only";
 import { Nango } from "@nangohq/node";
 
 import { GMAIL_INTEGRATION_ID, NANGO_SECRET_KEY } from "@/lib/nango";
+import { stripQuoted } from "@/mail/quote";
 
 /**
  * Sending from the user's own Gmail, and reading what comes back.
@@ -229,27 +230,12 @@ const textOf = (part: GmailPart | undefined): string => {
 };
 
 /**
- * Everything below this line is the email being replied to, not the reply.
- *
- * Every client quotes differently and none of them agree, so this matches the
- * three shapes that cover almost all of it: Gmail's "On <date> <name> wrote:",
- * a run of `>` quoting, and Outlook's horizontal rule of underscores. What is
- * left is what the person actually typed, which is the only part worth showing
- * or classifying.
+ * Quote stripping moved to src/mail/quote.ts when IMAP arrived and needed the
+ * same function. Imported *and* re-exported rather than only re-exported,
+ * because `readThread` below calls it directly and a bare `export { x } from`
+ * creates no local binding to call.
  */
-export const stripQuoted = (text: string) => {
-  const cut = text.search(
-    /^\s*(?:On .{5,120}wrote:|-{2,}\s*Original Message|_{5,}|From:\s.+<)/m,
-  );
-
-  const body = cut === -1 ? text : text.slice(0, cut);
-
-  return body
-    .split("\n")
-    .filter((line) => !/^\s*>/.test(line))
-    .join("\n")
-    .trim();
-};
+export { stripQuoted };
 
 export interface Incoming {
   messageId: string;

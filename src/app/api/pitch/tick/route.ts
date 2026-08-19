@@ -20,11 +20,13 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const mailboxes: {
-    projectId: string;
-    connectionId: string;
-    email: string;
-  }[] = Array.isArray(body?.mailboxes) ? body.mailboxes : [];
+
+  // Just the hustles with something outstanding. Which mailbox each
+  // conversation lives in is resolved per pitch inside `checkReplies` — with a
+  // rotation there is no single inbox for a project any more.
+  const mailboxes: { projectId: string }[] = Array.isArray(body?.mailboxes)
+    ? body.mailboxes
+    : [];
 
   // Sequential rather than parallel. This runs every sixty seconds against the
   // same three free model tiers the drafting queue uses, and a fan-out here
@@ -35,11 +37,7 @@ export async function POST(request: Request) {
 
   for (const mailbox of mailboxes) {
     try {
-      const result = await checkReplies(
-        mailbox.projectId,
-        mailbox.connectionId,
-        mailbox.email,
-      );
+      const result = await checkReplies(mailbox.projectId);
 
       checked += result.checked;
       answered += result.replies.length;

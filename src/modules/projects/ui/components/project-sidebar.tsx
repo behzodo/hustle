@@ -9,8 +9,8 @@ import {
   HammerIcon,
   LifebuoyIcon,
   PaperPlaneTiltIcon,
+  PhoneCallIcon,
   PlugIcon,
-  SquaresFourIcon,
 } from "@phosphor-icons/react";
 
 import { MetallicLogo } from "@/components/metallic-logo";
@@ -220,6 +220,17 @@ export const filedHref = (projectId: ProjectId) => `/hustles/${projectId}`;
 /** Where this hustle's outreach lives — the inbox the built sites are sent from. */
 export const pitchHref = (projectId: ProjectId) => `/hustles/${projectId}/pitch`;
 
+/**
+ * Where this hustle's phone lives.
+ *
+ * Scoped to the hustle like the two above, because the shops it answers for are
+ * the ones this patch found and sold to — a switchboard sitting out at the
+ * workspace level would be a list of every client from every patch, which is
+ * not a room anybody works in.
+ */
+export const switchboardHref = (projectId: ProjectId) =>
+  `/hustles/${projectId}/switchboard`;
+
 export const ProjectSidebar = ({
   projectId,
   fileRef,
@@ -281,7 +292,10 @@ export const ProjectSidebar = ({
   ];
 
   const platform = [
-    row("Dashboard", "/dashboard", SquaresFourIcon),
+    // The phone AI, named for what it is to the shop rather than for what it
+    // is to us. A tradesman on a roof does not buy a dashboard; he buys the
+    // thing that picks up while he is up there.
+    row("Switchboard", switchboardHref(projectId), PhoneCallIcon),
     row("Connections", "/connections", PlugIcon),
   ];
 
@@ -317,7 +331,10 @@ export const ProjectSidebar = ({
           </div>
 
           <div className="flex flex-col gap-1">
-            <GroupLabel>Platform</GroupLabel>
+            {/* Where the second sale lives. The site is the way in; what gets
+                charged for every month is the AI that answers their phone,
+                books their jobs and replies to their reviews. */}
+            <GroupLabel>Level 2 offer</GroupLabel>
             {platform.map(link)}
           </div>
         </div>

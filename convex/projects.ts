@@ -3,7 +3,7 @@ import { v, ConvexError } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { areaValidator } from "./schema";
 import { requireUserId, requireOwnedProject } from "./lib/auth";
-import { consumeCredit } from "./credits";
+
 import { taken } from "./sites";
 
 // Long enough for "Ravenscroft Family Dentistry, Leeds", short enough that the
@@ -175,10 +175,11 @@ export const create = mutation({
   handler: async (ctx, { name, value }) => {
     const userId = await requireUserId(ctx);
 
-    // Before the insert, so a caller who is out of credits never gets a
-    // half-created project. The whole mutation rolls back on throw.
-    await consumeCredit(ctx, userId);
-
+    // Free, deliberately. This used to take a credit, from back when a project
+    // *was* a build — one prompt in, one site out. It is now an empty canvas
+    // with a patch to draw on it, and charging for that taxes the act of
+    // starting, which is the last thing worth taxing. The sweep and the builds
+    // it leads to are where the money is; see src/lib/pricing.ts.
     const projectId = await ctx.db.insert("projects", {
       userId,
       name,

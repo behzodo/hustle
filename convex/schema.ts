@@ -65,6 +65,28 @@ export const pitchStatus = v.union(
   v.literal("failed"),
 );
 
+/**
+ * Where a domain order has got to.
+ *
+ * The line that matters is between "pending" and "paid": everything before it
+ * costs nobody anything and can be abandoned, and everything after it is
+ * somebody's money. An order stuck on "paid" is the one state worth an alert —
+ * it means the card was charged and the domain was not bought, which is the
+ * only failure here that owes a refund.
+ *
+ * "live" is the domain registered and pointed at the site. The certificate may
+ * still be issuing at that moment; `sslStatus` carries that separately,
+ * because a domain that resolves without HTTPS yet is a minute of waiting
+ * rather than a broken order.
+ */
+export const domainStatus = v.union(
+  v.literal("pending"),
+  v.literal("paid"),
+  v.literal("live"),
+  v.literal("failed"),
+  v.literal("refunded"),
+);
+
 // What a business is using instead of a website. `site` means they have their
 // own domain and are not a prospect; see src/modules/hustles/discovery/lead.ts
 // for why a Facebook page counts as a gap rather than a website.
@@ -145,6 +167,17 @@ export const leadFields = {
       // template that turns out to be wrong for a trade can be found again.
       template: v.string(),
       publishedAt: v.number(),
+      // The domain the client bought for this site, once they have.
+      //
+      // Denormalised off the `domains` table, which is the record of the
+      // purchase. Kept here because a card draws this on every render, and
+      // the alternative is a second query per lead to answer "has this one
+      // got a real address yet" — a hundred extra reads to draw one screen.
+      //
+      // Only ever written from an order that reached `live`. A domain that
+      // was paid for and then failed to register must not appear on a card as
+      // though it works.
+      customDomain: v.optional(v.string()),
       // What the robot did to get here.
       //
       // Kept because the page it produced is not the whole story and the
@@ -418,6 +451,21 @@ export default defineSchema({
     body: v.string(),
     status: pitchStatus,
 
+    // Which mailbox sent it.
+    //
+    // Set when the send slot is claimed, and it has to be stored rather than
+    // looked up again later, for a reason that only appears once there is more
+    // than one: a reply lives in the mailbox that sent the pitch and in no
+    // other. Asking the rotation a second time would hand back whichever is
+    // least busy now, which is the wrong inbox to go looking in — and the
+    // symptom is not an error, it is a conversation that appears unanswered
+    // forever.
+    //
+    // Optional because every pitch sent before mailboxes existed went out of
+    // the one Gmail account on the profile. See convex/pitches.ts, which falls
+    // back to it.
+    mailboxId: v.optional(v.id("mailboxes")),
+
     // Gmail's own ids, once it has accepted the message.
     //
     // The thread id is the only way a reply arriving days later can be matched
@@ -534,7 +582,257 @@ export default defineSchema({
     siteUrl: v.optional(v.string()),
   }).index("by_message", ["messageId"]),
 
+  // One domain somebody bought through the shop.
+  //
+  // Its own table rather than another optional object on the lead, for the
+  // same reason pitches are: this has a beginning and an end and money in the
+  // middle. An order that was paid for and failed to register has to survive
+  // as a record — it is somebody's twenty dollars — and a field on the lead
+  // would be overwritten by the next attempt.
+  //
+  // The row is written before the card is charged and updated afterwards, so
+  // a payment that succeeds and a fulfilment that does not leaves a `paid`
+  // row with the reason on it, which is exactly what a retry needs to find.
+  domains: defineTable({
+    userId: v.string(),
+    projectId: v.id("projects"),
+    // The site this domain shows. Optional because a domain can outlive the
+    // lead it was bought for — a deleted hustle must not orphan a renewal
+    // somebody is still paying for.
+    leadId: v.optional(v.id("leads")),
+    // Lowercase, no scheme: "joesgym.com".
+    domain: v.string(),
+    // The bucket prefix the domain resolves to. Stored rather than read off
+    // the lead because it is what was written into the mapping object, and a
+    // rebuilt site keeps its slug while a re-pointed domain does not.
+    slug: v.string(),
+    status: domainStatus,
+    // What the buyer paid, in cents. Set from the server's own quote — never
+    // from the browser, which only ever sees a price it was given.
+    priceCents: v.number(),
+    // What the registrar charged us, once it has. The margin is the pair.
+    costCents: v.optional(v.number()),
+    currency: v.string(),
+    // Stripe's checkout session. The one thing tying the row to the payment,
+    // and what makes fulfilment idempotent — a session already spent cannot
+    // buy a second domain.
+    sessionId: v.optional(v.string()),
+    // Cloudflare's custom hostname, for polling the certificate.
+    hostnameId: v.optional(v.string()),
+    // "pending_validation", "active" — Cloudflare's own words, shown while
+    // the certificate is still being issued.
+    sslStatus: v.optional(v.string()),
+    // Why it failed. An order that failed silently looks like one nobody
+    // finished, and the difference is whether somebody is owed a refund.
+    error: v.optional(v.string()),
+    registeredAt: v.optional(v.number()),
+    // When it has to be paid for again. A domain nobody renews stops
+    // resolving, and the client whose business is on it finds out first.
+    renewsAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    // Every domain this user owns — the shop's own list.
+    .index("by_user_and_updated", ["userId", "updatedAt"])
+    .index("by_lead", ["leadId"])
+    // Uniqueness, enforced by looking before claiming: two people must not be
+    // able to start an order for the same name at the same moment.
+    .index("by_domain", ["domain"])
+    // Fulfilment, keyed by the payment that paid for it.
+    .index("by_session", ["sessionId"]),
+
   profiles: defineTable(profileFields).index("by_user", ["userId"]),
+
+  /**
+   * The addresses a user sends from.
+   *
+   * Its own table rather than more optional columns on the profile, because a
+   * user has several and the whole point is that they have several. One
+   * mailbox can carry thirty or forty cold emails a day before a receiving
+   * server starts treating it as a machine, so a freelancer working a patch of
+   * two hundred businesses needs four or five of them and needs the queue to
+   * spread the work across them.
+   *
+   * Two providers live here at once. `gmail` is the original: their own
+   * account, connected through Nango, which holds the token. `infraforge` is
+   * what we sell them — a mailbox on a domain that exists to send cold email,
+   * so the account that gets burned is never the one their family writes to.
+   * See src/mail/index.ts, where the two become one interface.
+   */
+  mailboxes: defineTable({
+    userId: v.string(),
+    provider: v.union(v.literal("gmail"), v.literal("infraforge")),
+    email: v.string(),
+    /** Display name on the From header. A person, not a company. */
+    name: v.optional(v.string()),
+    domain: v.optional(v.string()),
+
+    /** Nango's handle, for `gmail`. Useless on its own, which is the point. */
+    connectionId: v.optional(v.string()),
+
+    /** Infraforge's own ids, for `infraforge`. */
+    externalId: v.optional(v.string()),
+    workspaceId: v.optional(v.string()),
+
+    /**
+     * SMTP and IMAP credentials, for `infraforge`.
+     *
+     * A password that sends email as somebody. Nothing public may return this
+     * field — every query that does is an internal one, and the screens read a
+     * different query that has never seen it. Storing it at all is a
+     * deliberate trade: the alternative is asking Infraforge for it on every
+     * send, which is a network call per email and a second place for the
+     * poll to fail.
+     */
+    credentials: v.optional(
+      v.object({
+        user: v.string(),
+        password: v.string(),
+        smtpHost: v.optional(v.string()),
+        smtpPort: v.optional(v.number()),
+        imapHost: v.optional(v.string()),
+        imapPort: v.optional(v.number()),
+      }),
+    ),
+
+    status: v.union(
+      // Bought, DNS not finished. Cannot send.
+      v.literal("provisioning"),
+      // Working, but still building a reputation. Sends at a reduced cap.
+      v.literal("warming"),
+      v.literal("active"),
+      // Turned off by the user, or by us when it started bouncing.
+      v.literal("paused"),
+      v.literal("failed"),
+    ),
+
+    /**
+     * Whether Infraforge warmed this before selling it.
+     *
+     * A brand-new domain needs four to six weeks of gradually increasing
+     * volume before it can carry a real send, which is an onboarding nobody
+     * waits through. A pre-warmed mailbox skips the ramp in `capFor` — it is
+     * most of what the price buys.
+     */
+    preWarmed: v.boolean(),
+
+    /** When the ramp starts counting from. */
+    warmedFrom: v.optional(v.number()),
+
+    /**
+     * Sends used today, and which day that is.
+     *
+     * A stamp rather than a timestamp to compare against, because the reset is
+     * a calendar event and not an elapsed hour: a mailbox that sent its last
+     * message at 11pm has a full allowance at midnight, not at 11pm tomorrow.
+     * Stored as "YYYY-MM-DD" in UTC — see convex/mailboxes.ts.
+     */
+    sentToday: v.number(),
+    dayStamp: v.string(),
+
+    /** Oldest-first rotation. See takeSendSlot. */
+    lastSentAt: v.optional(v.number()),
+
+    /** Why it failed, shown on the connections screen. */
+    error: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"])
+    // Rotation: this user's usable mailboxes, least recently used first.
+    .index("by_user_status_and_sent", ["userId", "status", "lastSentAt"])
+    // One row per address. Re-provisioning the same mailbox — which is what a
+    // credentials refresh is — has to find the existing row rather than insert
+    // beside it, or the rotation starts handing out two slots for one inbox.
+    .index("by_user_and_email", ["userId", "email"])
+    // Every sending mailbox across every user, for the minute-by-minute reply
+    // poll. Not scoped to a user for the same reason pitches has a status-only
+    // index: the cron does not know who has anything waiting until it looks,
+    // and reading the whole table once a minute is the thing being avoided.
+    .index("by_status", ["status"])
+    // Matching a provisioning callback back to the row that is waiting for it.
+    .index("by_external", ["externalId"]),
+
+  /**
+   * The meter. One row per user, holding everything a balance is made of.
+   *
+   * This replaces the @convex-dev/rate-limiter component, which was the right
+   * shape for the thing it was doing — one counter, one window, refilled whole
+   * — and the wrong shape the moment credits could be bought. A rate limiter
+   * has a rate; it has nowhere to put a thousand credits somebody paid for
+   * that must not expire when the month rolls over.
+   *
+   * So the balance is two numbers rather than one. `allowance - used` is what
+   * the plan gives and takes back; `packs` is what was purchased and stays.
+   * See `spend` in convex/credits.ts for why the allowance is drawn down
+   * first.
+   */
+  credits: defineTable({
+    userId: v.string(),
+    // The tier slug as of the last grant, so a downgrade is legible in support
+    // ("they were on Pro when this period started") without reading Clerk.
+    plan: v.string(),
+    /** The monthly grant. Reset whole at the top of each period. */
+    allowance: v.number(),
+    /** Spent from the allowance this period. Never exceeds it. */
+    used: v.number(),
+    /**
+     * When the current period opened.
+     *
+     * Rolls forward in whole periods rather than to `now` — see `meter` in
+     * convex/credits.ts. Anchoring to the moment of the first read after a
+     * lapse would walk a user's reset date later every month they took a
+     * weekend off.
+     */
+    periodStart: v.number(),
+    /**
+     * Purchased credits. Never expire, never reset.
+     *
+     * One number rather than a row per pack: they are fungible, nothing
+     * distinguishes a credit from March's pack from one bought today, and the
+     * receipt for each purchase is in `creditLedger` anyway.
+     */
+    packs: v.number(),
+  }).index("by_user", ["userId"]),
+
+  /**
+   * Every movement, and what caused it.
+   *
+   * Kept because a balance without a history is unarguable in the wrong
+   * direction: a user who says "I did not run two sweeps" has to be answered
+   * with something, and "the number says 5" is not an answer. It is also the
+   * only place the cost of a patch can be totted up after the fact — the leads
+   * table records that a site was built, not what it cost to build.
+   *
+   * Append-only. Nothing here is ever patched; a correction is another row.
+   */
+  creditLedger: defineTable({
+    userId: v.string(),
+    /**
+     * What happened. The spend kinds match `Chargeable` in convex/lib/pricing.ts;
+     * the rest are the ways credits arrive.
+     */
+    kind: v.union(
+      v.literal("sweep"),
+      v.literal("site"),
+      v.literal("pitch"),
+      v.literal("agent"),
+      v.literal("grant"),
+      v.literal("pack"),
+      v.literal("refund"),
+    ),
+    /** Negative for a spend, positive for anything that adds. */
+    amount: v.number(),
+    /** Total spendable credits immediately after this row. */
+    balance: v.number(),
+    /** Which hustle it was spent on, where that is knowable. */
+    projectId: v.optional(v.id("projects")),
+    /** Free text for the screen — a business name, a pack slug, a reason. */
+    note: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    // Idempotency for purchases: Stripe delivers a webhook more than once, and
+    // a pack credited twice is money given away. The session id goes in here.
+    .index("by_reference", ["userId", "note"]),
 
   feedback: defineTable({
     userId: v.string(),

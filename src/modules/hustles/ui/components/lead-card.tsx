@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { useMedia } from "@/hooks/use-media";
 import { describeGap, type WebPresence } from "@/modules/hustles/discovery/lead";
 
+import { LeadCardMenu } from "./lead-card-menu";
+
 /**
  * One business, on a card you turn over.
  *
@@ -51,6 +53,19 @@ export interface CardLead {
   lat: number;
   lng: number;
   placeId: string;
+  /**
+   * The site built for this business, once one has been.
+   *
+   * `url` is ours — a subdomain of the sites domain, handed out the moment the
+   * fast lane finishes. `customDomain` is the one somebody bought to replace
+   * it, and where both exist the second is the address that matters: it is
+   * what a client was given, and the first is the scaffolding underneath.
+   */
+  site?: {
+    url: string;
+    customDomain?: string;
+  };
+  siteStatus?: "queued" | "building" | "live" | "failed";
 }
 
 /**
@@ -111,9 +126,16 @@ export const LeadCard = ({
 
   const gap = describeGap(lead.presence, lead.socialKind);
 
+  // Only once there is something to act on. A business still in the queue has
+  // no site to open, no link to copy and nowhere to point a domain.
+  const built = lead.siteStatus === "live" && lead.site?.url ? lead.site : undefined;
+
   return (
     <div
-      className="group [perspective:1200px]"
+      // Positioned so the menu below can sit on the corner. It has to be out
+      // here rather than on the face: the face rotates, and a control on it
+      // turns away as the card does.
+      className="group relative [perspective:1200px]"
       onMouseEnter={canHover ? () => setFlipped(true) : undefined}
       onMouseLeave={canHover ? () => setFlipped(false) : undefined}
       // Focus and blur bubble, so this turns the card for anyone arriving by
@@ -281,6 +303,16 @@ export const LeadCard = ({
             {/* Which search turned it up. A surprising business on the list is
                 explainable rather than suspect. */}
             <Row label="found via">{lead.term}</Row>
+
+            {/* The address the site answers on, once it has one. Sits with the
+                phone number and the street rather than with the links below,
+                because that is what it is now: a way to reach this business,
+                and the one we made. */}
+            {built && (
+              <Row label="site">
+                {built.customDomain ?? built.url.replace(/^https:\/\//, "")}
+              </Row>
+            )}
           </dl>
 
           <div className="mt-auto flex items-center gap-4 pt-3">
@@ -321,6 +353,16 @@ export const LeadCard = ({
           </div>
         </div>
       </div>
+
+      {/* Outside the turning face, so it stays put while the card flips. */}
+      {built && (
+        <LeadCardMenu
+          leadId={lead._id}
+          name={lead.name}
+          url={built.url}
+          customDomain={built.customDomain}
+        />
+      )}
     </div>
   );
 };

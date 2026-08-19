@@ -224,6 +224,67 @@ export const queueProjectPitches = (projectId: string) =>
  * Returns the Gmail connection alongside the email, because the alternative is
  * a second round trip per send for a value that cannot change between the two.
  */
+/**
+ * The sender a claim hands back, as it crosses the bridge.
+ *
+ * Structurally the same as `Sender` in src/mail — deliberately not imported
+ * from there, because this file describes what Convex returns and that file
+ * describes what the transports accept. They agree today and the day they
+ * stop, the compiler should say so at the one call site that converts between
+ * them rather than silently accept a mailbox with no password in it.
+ */
+export interface BridgeSender {
+  mailboxId: string;
+  provider: "gmail" | "infraforge";
+  email: string;
+  name?: string;
+  connectionId?: string;
+  credentials?: {
+    user: string;
+    password: string;
+    smtpHost?: string;
+    smtpPort?: number;
+    imapHost?: string;
+    imapPort?: number;
+  };
+}
+
+/**
+ * Files a provisioned mailbox, credentials and all.
+ *
+ * Across the bridge rather than through a public mutation, for one reason: the
+ * body carries a password that sends email as somebody. A public mutation is
+ * called from a browser, which would mean that password making a round trip
+ * through the user's tab to reach the database it never needed to leave the
+ * server to get to.
+ */
+export const recordMailbox = (body: {
+  userId: string;
+  provider: "gmail" | "infraforge";
+  email: string;
+  name?: string;
+  domain?: string;
+  connectionId?: string;
+  externalId?: string;
+  workspaceId?: string;
+  credentials?: {
+    user: string;
+    password: string;
+    smtpHost?: string;
+    smtpPort?: number;
+    imapHost?: string;
+    imapPort?: number;
+  };
+  preWarmed: boolean;
+  status: "provisioning" | "warming" | "active" | "paused" | "failed";
+}) => call<{ mailboxId: string }>("/mailbox/record", body);
+
+export const setMailboxStatus = (body: {
+  mailboxId: string;
+  status: "provisioning" | "warming" | "active" | "paused" | "failed";
+  error?: string;
+}) => call<{ ok: boolean }>("/mailbox/status", body);
+
 export const takeNextPitch = (projectId: string) =>
   call<{
     next: {
@@ -232,8 +293,7 @@ export const takeNextPitch = (projectId: string) =>
       to: string;
       subject: string;
       body: string;
-      connectionId: string;
-      from: string;
+      sender: BridgeSender;
     } | null;
   }>("/pitch/next", { projectId });
 
@@ -263,6 +323,8 @@ export const fetchOpenPitches = (projectId: string) =>
         priceBand?: string;
         stripeAccountId?: string;
       };
+      /** Which mailbox this conversation lives in. Null when it has none left. */
+      mailbox: Omit<BridgeSender, "mailboxId"> | null;
     }[];
   }>("/pitch/open", { projectId });
 
@@ -305,3 +367,30 @@ export const recordPitchInvoice = (body: {
     fee: number;
   };
 }) => call<{ recorded: boolean }>("/pitch/invoice", body);
+
+/**
+ * Credits a pack somebody paid for.
+ *
+ * `reference` is the Stripe checkout session id, and passing the same one on a
+ * redelivery is what makes this safe to call twice — Convex refuses the second
+ * and reports `credited: false`. Never generate it; take it off the event.
+ */
+export const creditPack = (body: {
+  userId: string;
+  credits: number;
+  reference: string;
+}) => call<{ credited: boolean; balance: number }>("/credits/pack", body);
+
+/**
+ * Tells Convex which plan a user is on.
+ *
+ * The one piece of state that has to travel this way rather than in the token:
+ * Clerk refuses to put billing claims into a custom JWT template, so the
+ * answer is fetched on the Next side — where `auth().has()` works — and
+ * relayed. Safe because this door is server-only; see convex/credits.ts.
+ */
+export const syncEntitlement = (body: {
+  userId: string;
+  plan: string;
+  credits: number;
+}) => call<{ plan: string; allowance: number; total: number }>("/credits/plan", body);

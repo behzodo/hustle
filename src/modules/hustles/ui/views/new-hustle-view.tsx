@@ -21,6 +21,8 @@ import { SlicedWaves } from "@/components/ui/sliced-waves";
 
 import type { HustleArea } from "../../area";
 import { HustleSummary } from "../components/hustle-summary";
+import { ModePicker } from "../components/mode-picker";
+import { DEFAULT_HUSTLE_MODE, type HustleMode } from "../../modes";
 import { suggestHustleNames } from "../../hustle-names";
 import {
   hustleAreaSchema,
@@ -57,6 +59,11 @@ const STEPS = [
     title: "Where are you hunting?",
     blurb:
       "Draw round the patch, or drop a pin and set how far to look. This is where we search for businesses with no website.",
+  },
+  {
+    title: "What are you selling?",
+    blurb:
+      "The site is what gets you in the door. Whether you sell it, give it away and charge monthly for the AI that runs their front desk, or both, is this choice.",
   },
   {
     title: "Ready to go",
@@ -96,6 +103,11 @@ export const NewHustleView = () => {
   const [area, setArea] = useState<HustleArea | null>(null);
   const [areaError, setAreaError] = useState<string | null>(null);
 
+  // Picked, shown back on the summary, and then dropped: `createDraft` does not
+  // take a mode yet. Front of the flow only until the other two lanes mean
+  // something.
+  const [mode, setMode] = useState<HustleMode>(DEFAULT_HUSTLE_MODE);
+
   // The city and trades from onboarding are what a hustle name is made of,
   // so the suggestions are theirs rather than generic.
   const profile = useQuery(api.profiles.status);
@@ -130,9 +142,10 @@ export const NewHustleView = () => {
 
     setAreaError(null);
 
-    // The patch is set; show it back before anything is created.
-    if (step === 1) {
-      setStep(2);
+    // The patch is set. Everything between here and the last step only has to
+    // be walked through — the mode has a default and the summary is a read.
+    if (!isLast) {
+      setStep((current) => current + 1);
       return;
     }
 
@@ -216,11 +229,11 @@ export const NewHustleView = () => {
           // usual top margin would open the step already scrolled. The summary
           // sits between the two — wide enough for the map picture, narrow
           // enough that the rows stay readable.
-          step === 1
-            ? "max-w-5xl md:pt-6"
-            : step === 2
-              ? "max-w-4xl md:pt-6"
-              : "max-w-xl md:pt-12",
+          step === 0
+            ? "max-w-xl md:pt-12"
+            : step === 1
+              ? "max-w-5xl md:pt-6"
+              : "max-w-4xl md:pt-6",
         )}
       >
         <div className="mb-8">
@@ -345,10 +358,15 @@ export const NewHustleView = () => {
               </div>
             )}
 
-            {step === 2 && area && (
+            {step === 2 && (
+              <ModePicker value={mode} onChange={setMode} disabled={saving} />
+            )}
+
+            {step === 3 && area && (
               <HustleSummary
                 name={form.getValues("name")}
                 area={area}
+                mode={mode}
                 disabled={saving}
                 onEdit={setStep}
               />

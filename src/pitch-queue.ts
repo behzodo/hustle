@@ -11,7 +11,9 @@ import {
   saveLeadPitch,
   takeNextPitch,
 } from "@/inngest/convex";
-import { findEmail, readReply, readThread, sendMail, writePitch } from "@/pitch";
+import { readVia, sendVia, type Sender } from "@/mail";
+import type { BridgeSender } from "@/inngest/convex";
+import { findEmail, readReply, writePitch } from "@/pitch";
 import { writeAnswer } from "@/pitch/answer";
 import { closeIfAgreed } from "@/pay/close";
 import { appendPitchMessage } from "@/inngest/convex";
@@ -243,6 +245,33 @@ export const draftPitches = async (
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Turns what Convex stored into something that can actually send.
+ *
+ * Returns null rather than throwing when the row is incomplete — a Gmail
+ * mailbox whose connection was revoked, or an Infraforge one whose credentials
+ * were never fetched. Both are real states and neither should take down a run
+ * of two hundred: the pitch is failed with a reason and the queue moves on.
+ */
+const senderFrom = (
+  bridge: Omit<BridgeSender, "mailboxId">,
+): Sender | null => {
+  if (bridge.provider === "gmail") {
+    return bridge.connectionId
+      ? { kind: "gmail", email: bridge.email, connectionId: bridge.connectionId }
+      : null;
+  }
+
+  return bridge.credentials
+    ? {
+        kind: "infraforge",
+        email: bridge.email,
+        name: bridge.name,
+        ...bridge.credentials,
+      }
+    : null;
+};
+
 export interface SendResult {
   queued: number;
   sent: { pitchId: string; business: string; to: string }[];
@@ -291,12 +320,30 @@ export const sendPitches = async (
     const { next } = await takeNextPitch(projectId);
     if (!next) break;
 
+    const sender = senderFrom(next.sender);
+
+    if (!sender) {
+      const error =
+        "That mailbox has no working credentials. Reconnect it on the connections screen.";
+
+      // The slot it was claimed against is already spent — takeNext counts
+      // before sending, on purpose — so this costs the mailbox one of today's
+      // allowance. Cheaper than the alternative, which is a crash loop that
+      // spends all of them.
+      await recordPitchSent({ pitchId: next.pitchId, error }).catch(() => {});
+
+      const record = { pitchId: next.pitchId, business: next.business, error };
+      failed.push(record);
+      events.onFailed?.(record);
+      continue;
+    }
+
     try {
-      const result = await sendMail(next.connectionId, {
+      const result = await sendVia(sender, {
         to: next.to,
         subject: next.subject,
         body: next.body,
-        from: { email: next.from },
+        from: { email: sender.email, name: sender.kind === "infraforge" ? sender.name : undefined },
       });
 
       await recordPitchSent({ pitchId: next.pitchId, gmail: result });
@@ -340,19 +387,22 @@ export interface ReplyResult {
  * not moved is skipped before anything is read, so a hundred open pitches
  * costs a hundred small reads and nothing else.
  */
-export const checkReplies = async (
-  projectId: string,
-  connectionId: string,
-  us: string,
-): Promise<ReplyResult> => {
+export const checkReplies = async (projectId: string): Promise<ReplyResult> => {
   const { open } = await fetchOpenPitches(projectId);
   const replies: ReplyResult["replies"] = [];
 
   for (const pitch of open) {
+    // Per conversation, not per project. With a rotation the pitches in one
+    // hustle went out of several mailboxes, and a reply is only in the one
+    // that sent it — reading them all through a single connection finds
+    // nothing and reports it as nobody having answered.
+    const mailbox = pitch.mailbox ? senderFrom(pitch.mailbox) : null;
+    if (!mailbox) continue;
+
     let messages;
 
     try {
-      messages = await readThread(connectionId, pitch.threadId, us);
+      messages = await readVia(mailbox, pitch.threadId);
     } catch {
       // A thread the user deleted, or a connection that has gone. Neither is
       // worth failing the whole sweep for.
@@ -420,11 +470,17 @@ export const checkReplies = async (
     if (!answer || answer.blocked) continue;
 
     try {
-      await sendMail(connectionId, {
+      // Answered from the mailbox that sent the pitch, which is also the one
+      // holding the thread. Replying from a different address would arrive as
+      // a stranger joining the conversation.
+      await sendVia(mailbox, {
         to: pitch.to,
         subject: pitch.subject.startsWith("Re:") ? pitch.subject : `Re: ${pitch.subject}`,
         body: closed ? [answer.body, closed.line].join("\n\n") : answer.body,
-        from: { email: us },
+        from: {
+          email: mailbox.email,
+          name: mailbox.kind === "infraforge" ? mailbox.name : undefined,
+        },
         replyTo: { threadId: pitch.threadId, rfcId: pitch.rfcId },
       });
 

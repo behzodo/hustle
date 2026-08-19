@@ -381,4 +381,61 @@ http.route({
   }),
 });
 
+/**
+ * Tells Convex which plan the caller is on.
+ *
+ * The plan cannot reach here in the token — Clerk will not put its billing
+ * claims in a custom JWT template — so Next.js asks Clerk and relays the
+ * answer through this door. See `setPlan` in convex/credits.ts for the whole
+ * reasoning; the short version is that this route is server-only, and that is
+ * what makes an allowance arriving as an argument safe.
+ */
+http.route({
+  path: "/credits/plan",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    const result = await ctx.runMutation(internal.credits.setPlan, {
+      userId: body.userId,
+      plan: body.plan,
+      credits: body.credits,
+    });
+
+    return Response.json(result);
+  }),
+});
+
+/**
+ * Credits a paid pack.
+ *
+ * Called by the Stripe webhook in src/app/api/stripe/webhook, which is where
+ * the signature is verified — this side only ever sees a request that already
+ * carries the shared secret, and treats that as proof the sale was real.
+ *
+ * The `reference` is Stripe's checkout session id and is what makes a repeat
+ * delivery harmless; see `creditPack` in convex/credits.ts. It is the caller's
+ * job to send the same one every time, which it does by taking it off the
+ * event rather than generating anything.
+ */
+http.route({
+  path: "/credits/pack",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    const result = await ctx.runMutation(internal.credits.creditPack, {
+      userId: body.userId,
+      credits: body.credits,
+      reference: body.reference,
+    });
+
+    return Response.json(result);
+  }),
+});
+
 export default http;

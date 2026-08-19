@@ -4,6 +4,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId } from "./lib/auth";
+import { CREDIT_COSTS, refund, spend } from "./credits";
 
 /**
  * Addresses, and who holds them.
@@ -77,6 +78,19 @@ export const claimForLead = internalMutation({
       throw new ConvexError({ code: "NOT_FOUND", message: "That lead no longer exists." });
     }
 
+    // Charged here because this is the gate every build goes through, on both
+    // lanes, and it sits before the first model call — the cheapest place to
+    // refuse and the only one that cannot be skipped.
+    //
+    // A rebuild pays again. It writes fresh copy, which is another model call
+    // and another upload; the address staying the same is the point of a
+    // rebuild, not a discount on one. Callers that do not want to pay twice
+    // check `alreadyLive` and never get here — see src/inngest/fast.ts.
+    await spend(ctx, lead.userId, "site", {
+      projectId: lead.projectId,
+      note: lead.name,
+    });
+
     if (lead.site) return { slug: lead.site.slug, url: lead.site.url };
 
     for (const slug of candidates) {
@@ -128,7 +142,19 @@ export const recordLead = internalMutation({
     if (!lead) return null;
 
     await ctx.db.patch(leadId, {
-      site: { slug, url, template, publishedAt: Date.now(), build },
+      site: {
+        slug,
+        url,
+        template,
+        publishedAt: Date.now(),
+        build,
+        // Carried across rather than rewritten. A rebuild replaces the page,
+        // not the address it answers on — and this one was paid for, is in a
+        // client's hands, and is not this mutation's to drop.
+        ...(lead.site?.customDomain
+          ? { customDomain: lead.site.customDomain }
+          : {}),
+      },
       siteStatus: "live",
       // Cleared rather than left behind: a lead that failed last night and
       // built this morning is not a lead with a problem.
@@ -158,6 +184,13 @@ export const failLead = internalMutation({
       siteStatus: "failed",
       siteError: error.slice(0, 400),
     });
+
+    // No site, no charge. `claimForLead` took the credit on the way in, and a
+    // business whose page never went up did not get what that paid for.
+    //
+    // Not conditional on how far the build got, unlike a sweep: there is only
+    // one outcome worth anything here and it is a live address.
+    await refund(ctx, lead.userId, CREDIT_COSTS.site, `Build failed — ${lead.name}`);
 
     return null;
   },

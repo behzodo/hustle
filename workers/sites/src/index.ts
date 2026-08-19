@@ -98,6 +98,61 @@ const slugFrom = (host: string, domain: string) => {
 };
 
 /**
+ * The slug behind a domain somebody bought.
+ *
+ * `joesgym.com` carries no subdomain to read a slug out of, so the answer is
+ * written into the bucket at purchase time — see src/domains/map.ts. This is
+ * the read of it.
+ *
+ * Cached in the Worker's own cache rather than looked up every time. A mapping
+ * changes when a domain is re-pointed, which is close to never, and a site on
+ * a bought domain would otherwise pay two round trips to storage for every
+ * request instead of one. Five minutes is short enough that a re-point takes
+ * effect while somebody is still looking at the screen that did it.
+ */
+const CUSTOM_TTL_SEC = 300;
+
+const mappedSlug = async (host: string, env: Env): Promise<string | null> => {
+  const name = host.split(":")[0].toLowerCase();
+
+  // A key rather than the request URL: the cache is shared across every site
+  // this Worker serves, and keying on the visitor's own URL would store one
+  // entry per page rather than one per domain.
+  const cacheKey = new Request(`https://sites.internal/_map/${name}`);
+  const cache = caches.default;
+
+  const hit = await cache.match(cacheKey);
+
+  if (hit) {
+    const { slug } = (await hit.json()) as { slug?: string };
+    return slug ?? null;
+  }
+
+  const object = await env.SITES.get(`_map/${name}`);
+  if (!object) return null;
+
+  const body = await object.text();
+  const { slug } = JSON.parse(body) as { slug?: string };
+
+  // One level only, for the same reason as slugFrom: a mapping is a file in
+  // the same bucket as the sites, and a slug with a slash in it would read as
+  // a path into somebody else's.
+  if (!slug || slug.includes("/") || slug.includes(".")) return null;
+
+  await cache.put(
+    cacheKey,
+    new Response(body, {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": `public, max-age=${CUSTOM_TTL_SEC}`,
+      },
+    }),
+  );
+
+  return slug;
+};
+
+/**
  * Who may frame a published site.
  *
  * `'self'` keeps a site able to frame its own pages. Everything after it is
@@ -119,7 +174,13 @@ const notFound = (message: string) =>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const slug = slugFrom(url.hostname, env.SITES_DOMAIN);
+
+    // Our own subdomain first, because it is every site's address the moment
+    // it is built and most of them never get another. A bought domain falls
+    // through to the mapping, which costs a read the common case does not pay.
+    const slug =
+      slugFrom(url.hostname, env.SITES_DOMAIN) ??
+      (await mappedSlug(url.hostname, env));
 
     if (!slug) return notFound("That address does not point at a site.");
 

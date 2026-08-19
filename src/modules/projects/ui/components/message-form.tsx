@@ -34,7 +34,11 @@ export const MessageForm = ({ projectId }: Props) => {
 
   // Reactive, so spending a credit updates the counter in every open tab.
   // The tRPC version needed an explicit invalidate after each send.
-  const usage = useQuery(api.credits.status);
+  //
+  // `balance` rather than `status`: this panel sits above the box that spends
+  // them, so it is the one place worth telling a plan credit from a bought
+  // one — only half of what is shown here comes back on the reset date.
+  const usage = useQuery(api.credits.balance);
   const sendMessage = useMutation(api.messages.send);
   const [isPending, setIsPending] = useState(false);
 
@@ -80,8 +84,9 @@ export const MessageForm = ({ projectId }: Props) => {
     <Form {...form}>
       {showUsage && (
         <Usage
-          points={usage!.remainingPoints}
-          msBeforeNext={usage!.msBeforeNext}
+          points={usage!.total}
+          msBeforeNext={usage!.msBeforeReset}
+          packs={usage!.packs}
         />
       )}
       <form

@@ -40,7 +40,11 @@ export async function POST(
 
   // Checked rather than trusted. Everything past this line either spends the
   // account's model allowance or sends email from a real person's inbox.
-  let profile: { gmailConnectionId?: string; gmailEmail?: string } | null = null;
+  let capacity: {
+    mailboxes: number;
+    sendable: number;
+    remainingToday: number;
+  } | null = null;
 
   try {
     const token = await getToken({ template: "convex" });
@@ -54,7 +58,7 @@ export async function POST(
 
     if (!project) return new Response("Not found", { status: 404 });
 
-    profile = await fetchQuery(api.profiles.status, {}, { token });
+    capacity = await fetchQuery(api.mailboxes.capacity, {}, { token });
   } catch {
     return new Response("Not found", { status: 404 });
   }
@@ -67,12 +71,32 @@ export async function POST(
     return Response.json({ started: true });
   }
 
-  // Both of the remaining actions touch Gmail, so the connection is checked
-  // here — before anything is queued — rather than discovered one row at a
-  // time by a worker that can only mark them failed.
-  if (!profile?.gmailConnectionId || !profile.gmailEmail) {
+  // Both of the remaining actions need somewhere to send from, so it is
+  // checked here — before anything is queued — rather than discovered one row
+  // at a time by a worker that can only mark them failed.
+  //
+  // Capacity rather than existence. A user with four mailboxes that have all
+  // hit today's ceiling is in a different situation from one with none, and
+  // the queue would stop identically in both — so the difference has to be
+  // said here or it is never said at all.
+  if (!capacity || capacity.sendable === 0) {
     return Response.json(
-      { error: "Connect a Google account first." },
+      {
+        error:
+          capacity && capacity.mailboxes > 0
+            ? "Every mailbox is paused or still being set up."
+            : "Add a mailbox first, or connect a Google account.",
+      },
+      { status: 409 },
+    );
+  }
+
+  if (action === "send" && capacity.remainingToday === 0) {
+    return Response.json(
+      {
+        error:
+          "Today's sending allowance is used up. The queue picks up again tomorrow.",
+      },
       { status: 409 },
     );
   }
@@ -88,11 +112,7 @@ export async function POST(
   // Replies are the one action worth waiting for: it is a handful of reads
   // against threads that mostly have not moved, and the screen has nothing
   // useful to show while it happens.
-  const result = await checkReplies(
-    projectId,
-    profile.gmailConnectionId,
-    profile.gmailEmail,
-  );
+  const result = await checkReplies(projectId);
 
   return Response.json(result);
 }

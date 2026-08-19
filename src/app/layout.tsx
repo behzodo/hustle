@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { after } from "next/server";
 import { ThemeProvider } from "next-themes";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 
 import { siteConfig } from "@/lib/site";
+import { syncPlan } from "@/lib/entitlement";
 import { Toaster } from "@/components/ui/sonner";
 import { TRPCReactProvider } from "@/trpc/client";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
@@ -96,6 +98,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // After the response, not during it. Clerk holds the plan and Convex holds
+  // the balance, and this is the only line between them — but it is a network
+  // call on the way to a billing lookup, and nobody should wait behind one to
+  // see a page. See src/lib/entitlement.ts for why it has to happen here at
+  // all rather than travelling in the token.
+  after(syncPlan);
+
   return (
     <ClerkProvider
       localization={clerkLocalization}

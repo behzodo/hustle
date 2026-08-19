@@ -3,7 +3,7 @@ import { v, ConvexError } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { messageRole, messageType } from "./schema";
 import { requireUserId, requireOwnedProject } from "./lib/auth";
-import { consumeCredit } from "./credits";
+import { spend } from "./credits";
 
 // A Convex document is capped at 1 MiB. Checked a little under that so the
 // error names the real cause instead of surfacing as a platform rejection
@@ -77,7 +77,11 @@ export const send = mutation({
   handler: async (ctx, { projectId, value }) => {
     const { userId } = await requireOwnedProject(ctx, projectId);
 
-    await consumeCredit(ctx, userId);
+    // The slow lane: a sandbox for minutes and tens of thousands of OpenAI
+    // tokens. Charged before the insert, so a caller who cannot afford it
+    // never gets a message sitting in a project with no run behind it — the
+    // throw rolls the whole mutation back.
+    await spend(ctx, userId, "agent", { projectId });
 
     const messageId = await ctx.db.insert("messages", {
       projectId,

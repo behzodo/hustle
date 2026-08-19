@@ -7,12 +7,16 @@ import {
   ChatTeardropDotsIcon,
   CoinsIcon,
   GaugeIcon,
+  GlobeIcon,
   LifebuoyIcon,
   PlugsConnectedIcon,
   PlusIcon,
 } from "@phosphor-icons/react";
 
+import { useConvexAuth, useQuery } from "convex/react";
+
 import { cn } from "@/lib/utils";
+import { api } from "@/../convex/_generated/api";
 import { MetallicLogo } from "@/components/metallic-logo";
 import { NavMain, type NavItem } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -35,6 +39,9 @@ import {
 const NAV_MAIN: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: GaugeIcon },
   { title: "Your hustles", url: "/hustles", icon: BrowsersIcon },
+  // Below hustles because that is where a domain is bought from — the card,
+  // not this screen. This is where they are kept afterwards.
+  { title: "Domains", url: "/domains", icon: GlobeIcon },
   { title: "Connections", url: "/connections", icon: PlugsConnectedIcon },
   { title: "Plan & credits", url: "/pricing", icon: CoinsIcon },
 ];
@@ -46,10 +53,21 @@ const NAV_SECONDARY = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const projects = useProjects();
+  const { isAuthenticated } = useConvexAuth();
+  const domains = useQuery(api.domains.attention, isAuthenticated ? {} : "skip");
 
-  const items = NAV_MAIN.map((item) =>
-    item.url === "/hustles" ? { ...item, count: projects?.length } : item,
-  );
+  const items = NAV_MAIN.map((item) => {
+    if (item.url === "/hustles") return { ...item, count: projects?.length };
+
+    // The count on Domains is what is owned, unless something is unfinished —
+    // then it is that, because an order somebody paid for and never received
+    // is the only number on this rail worth walking across the room for.
+    if (item.url === "/domains" && domains) {
+      return { ...item, count: domains.stuck || domains.total || undefined };
+    }
+
+    return item;
+  });
 
   return (
     <Sidebar
