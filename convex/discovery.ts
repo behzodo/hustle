@@ -10,6 +10,8 @@ import {
 } from "./_generated/server";
 import { huntQueryValidator, webPresence } from "./schema";
 import { requireOwnedProject, requireUserId } from "./lib/auth";
+import { CREDIT_COSTS, refund, spend } from "./credits";
+import { leadFields } from "./schema";
 import { PlacesError, provider, searchPlaces } from "./lib/places";
 import {
   PAGES_PER_QUERY,
@@ -76,6 +78,7 @@ const huntShape = v.object({
   cursor: v.number(),
   scanned: v.number(),
   found: v.number(),
+  outside: v.optional(v.number()),
   requests: v.number(),
   startedAt: v.number(),
   finishedAt: v.optional(v.number()),
@@ -84,27 +87,21 @@ const huntShape = v.object({
   provider: v.optional(v.string()),
 });
 
+/**
+ * A lead, as the browser gets one.
+ *
+ * Spread from the schema rather than restated. A `returns` validator is
+ * exact — a field present on the document and absent here is a thrown error,
+ * not an omission — and this was written out by hand twice, and was wrong
+ * both times: once when the fast lane added `site`, once when the pitch lane
+ * added `contact`. Each time it took the whole hustle screen down for every
+ * business that had been touched. A list kept in step by hand is a list that
+ * goes out of step; this one cannot.
+ */
 const leadShape = v.object({
   _id: v.id("leads"),
   _creationTime: v.number(),
-  projectId: v.id("projects"),
-  userId: v.string(),
-  huntId: v.id("hunts"),
-  placeId: v.string(),
-  name: v.string(),
-  lat: v.number(),
-  lng: v.number(),
-  address: v.optional(v.string()),
-  phone: v.optional(v.string()),
-  website: v.optional(v.string()),
-  presence: webPresence,
-  target: v.boolean(),
-  socialKind: v.optional(v.string()),
-  rating: v.optional(v.number()),
-  reviewCount: v.optional(v.number()),
-  categories: v.array(v.string()),
-  score: v.number(),
-  term: v.string(),
+  ...leadFields,
 });
 
 /** A listing as the sweep hands it to the writer. */
@@ -119,6 +116,7 @@ const findShape = v.object({
   rating: v.optional(v.number()),
   reviewCount: v.optional(v.number()),
   categories: v.array(v.string()),
+  photo: v.optional(v.string()),
   term: v.string(),
   // Absent for the Google-shaped providers, where a blank website means the
   // owner has none. False from OpenStreetMap, where it means nobody said.
@@ -180,6 +178,22 @@ export const start = mutation({
       });
     }
 
+    // Charged here, once, for the whole plan — not per search.
+    //
+    // A sweep is the only step that spends real money at a rate we do not
+    // control: up to ninety-six billed pages at a scraper's price. Taking it
+    // upfront is also what makes the refund below possible, and what stops a
+    // patch being half-swept on an empty balance.
+    //
+    // After the duplicate-hunt check above, so a double-clicked button returns
+    // the running hunt without being billed a second time. Before the insert,
+    // so a caller who cannot afford it gets no hunt row at all — the throw
+    // rolls the transaction back, schedule and all.
+    await spend(ctx, userId, "sweep", {
+      projectId,
+      note: project.area.label,
+    });
+
     const huntId = await ctx.db.insert("hunts", {
       projectId,
       userId,
@@ -188,6 +202,7 @@ export const start = mutation({
       cursor: 0,
       scanned: 0,
       found: 0,
+      outside: 0,
       requests: 0,
       startedAt: Date.now(),
       gl: countryFor(project.area.label),
@@ -337,6 +352,7 @@ export const absorb = internalMutation({
 
     let scanned = 0;
     let found = 0;
+    let outside = 0;
 
     // The same shop comes back on both pages of a search and again under the
     // next term. Within one batch that is caught here; across batches, by the
@@ -349,7 +365,15 @@ export const absorb = internalMutation({
 
       // Google answers a viewport, not a shape. Without this a patch drawn
       // around one neighbourhood fills up with the next town over.
-      if (area !== undefined && !withinArea(area, find)) continue;
+      //
+      // Counted on the way past rather than dropped silently: a sweep that
+      // rejects everything it was given and a sweep that was given nothing
+      // both end at zero leads, and the user has to fix a different thing in
+      // each case.
+      if (area !== undefined && !withinArea(area, find)) {
+        outside += 1;
+        continue;
+      }
 
       const verdict = readWebsite(find.website, find.websiteKnown ?? true);
 
@@ -366,6 +390,7 @@ export const absorb = internalMutation({
         ...(find.rating === undefined ? {} : { rating: find.rating }),
         ...(find.reviewCount === undefined ? {} : { reviewCount: find.reviewCount }),
         categories: find.categories,
+        ...(find.photo === undefined ? {} : { photo: find.photo }),
         score: scoreLead({
           presence: verdict.presence,
           reviewCount: find.reviewCount,
@@ -406,6 +431,11 @@ export const absorb = internalMutation({
       cursor,
       scanned: hunt.scanned + scanned,
       found: hunt.found + found,
+      // Absent on every hunt from before this was counted, which is not the
+      // same as zero — but treating it as zero only understates a number that
+      // is there to explain an empty screen, and those hunts have no screen
+      // left to explain.
+      outside: (hunt.outside ?? 0) + outside,
       requests: hunt.requests + requests,
     });
 
@@ -439,6 +469,23 @@ export const fail = internalMutation({
       // a whole HTML page.
       error: error.slice(0, 300),
     });
+
+    // A sweep that fell over before it found anything is a sweep the user did
+    // not get. The credits go back.
+    //
+    // Only when the count is zero, and deliberately not pro-rated below that:
+    // a hunt that died on its fortieth query with two hundred businesses in
+    // the bag delivered the thing that was paid for, and working out what
+    // fraction of a patch is worth what fraction of ten credits is an argument
+    // nobody wins. All or nothing is a rule a user can predict.
+    if (hunt.scanned === 0) {
+      await refund(
+        ctx,
+        hunt.userId,
+        CREDIT_COSTS.sweep,
+        "Sweep failed before it found anything",
+      );
+    }
 
     return null;
   },

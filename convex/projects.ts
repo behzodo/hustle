@@ -1,9 +1,10 @@
 import { v, ConvexError } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { areaValidator } from "./schema";
 import { requireUserId, requireOwnedProject } from "./lib/auth";
-import { consumeCredit } from "./credits";
+
+import { taken } from "./sites";
 
 // Long enough for "Ravenscroft Family Dentistry, Leeds", short enough that the
 // name still fits on a hustle card without truncating to nothing.
@@ -30,6 +31,7 @@ const projectShape = v.object({
   name: v.string(),
   updatedAt: v.number(),
   area: v.optional(areaValidator),
+  bench: v.optional(v.object({ id: v.string(), provider: v.string() })),
 });
 
 /** One project, if it belongs to the caller. */
@@ -173,10 +175,11 @@ export const create = mutation({
   handler: async (ctx, { name, value }) => {
     const userId = await requireUserId(ctx);
 
-    // Before the insert, so a caller who is out of credits never gets a
-    // half-created project. The whole mutation rolls back on throw.
-    await consumeCredit(ctx, userId);
-
+    // Free, deliberately. This used to take a credit, from back when a project
+    // *was* a build — one prompt in, one site out. It is now an empty canvas
+    // with a patch to draw on it, and charging for that taxes the act of
+    // starting, which is the last thing worth taxing. The sweep and the builds
+    // it leads to are where the money is; see src/lib/pricing.ts.
     const projectId = await ctx.db.insert("projects", {
       userId,
       name,
@@ -245,5 +248,81 @@ export const remove = mutation({
 
     await ctx.db.delete(projectId);
     return null;
+  },
+});
+
+/**
+ * Claims the address this project's site will be published at.
+ *
+ * Called by the build, through the HTTP door in convex/http.ts, the first time
+ * a site compiles. Not called again after that: the first branch is the point
+ * of the whole function. A project that already has a slug keeps it, whatever
+ * it is now called and however many times it is rebuilt, because the slug has
+ * been in a client's inbox since the day it was claimed.
+ *
+ * The caller sends a short list of names in order of preference rather than
+ * one, because a collision is resolved by asking again and each ask is a round
+ * trip. `slugCandidates` in src/publish/slug.ts builds the list; the second
+ * entry carries a tag derived from the project id, so the loop below is
+ * expected to end on the first or second try and the list is not a search.
+ */
+export const claimSite = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    candidates: v.array(v.string()),
+    // Passed in rather than read from a Convex environment variable, so the
+    // domain is configured in exactly one place — the .env the build runs
+    // with — instead of two that can disagree.
+    domain: v.string(),
+  },
+  returns: v.object({ slug: v.string(), url: v.string() }),
+  handler: async (ctx, { projectId, candidates, domain }) => {
+    const project = await ctx.db.get(projectId);
+
+    if (!project) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "That hustle no longer exists.",
+      });
+    }
+
+    if (project.site) {
+      return { slug: project.site.slug, url: project.site.url };
+    }
+
+    for (const slug of candidates) {
+      // Both tables, not just this one: leads publish under the same domain.
+      // See convex/sites.ts.
+      if (await taken(ctx, slug)) continue;
+
+      const url = `https://${slug}.${domain}`;
+      await ctx.db.patch(projectId, { site: { slug, url } });
+
+      return { slug, url };
+    }
+
+    // Both candidates taken means two projects share a name *and* an id hash,
+    // which is a bug rather than a busy afternoon. Loud, because silently
+    // publishing over somebody else's site is the alternative.
+    throw new ConvexError({
+      code: "SLUG_UNAVAILABLE",
+      message: `No address is free for this hustle (tried ${candidates.join(", ")}).`,
+    });
+  },
+});
+
+/**
+ * What the build needs to know about the project it is building.
+ *
+ * Only the name, today, which is what the published subdomain is derived from.
+ * Internal: read by the Inngest job through convex/http.ts, which has no user
+ * session to check ownership against and carries the shared secret instead.
+ */
+export const basicsForAgent = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.union(v.object({ name: v.string() }), v.null()),
+  handler: async (ctx, { projectId }) => {
+    const project = await ctx.db.get(projectId);
+    return project ? { name: project.name } : null;
   },
 });

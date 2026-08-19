@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentTheme } from "@/hooks/use-current-theme";
 
 import { formatDiameter, formatRadius, type HustleArea } from "../../area";
+import { modeInfo, type HustleMode } from "../../modes";
 import { staticMapUrl } from "../../static-map";
 
 const Row = ({ label, value }: { label: string; value: string }) => (
@@ -22,12 +23,13 @@ const Row = ({ label, value }: { label: string; value: string }) => (
 interface Props {
   name: string;
   area: HustleArea;
+  mode: HustleMode;
   /** Jump back to the step that set a given field. */
   onEdit: (step: number) => void;
   disabled?: boolean;
 }
 
-export const HustleSummary = ({ name, area, onEdit, disabled }: Props) => {
+export const HustleSummary = ({ name, area, mode, onEdit, disabled }: Props) => {
   const theme = useCurrentTheme();
   const [artFailed, setArtFailed] = useState(false);
 
@@ -92,23 +94,37 @@ export const HustleSummary = ({ name, area, onEdit, disabled }: Props) => {
                 : `Circle, ${formatRadius(area.radiusM)} radius`
             }
           />
+          <Row label="Selling" value={modeInfo(mode).tagline} />
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-4">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="text-muted-foreground text-sm">
             Change any of this later from the hustle itself.
           </p>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onEdit(1)}
-            className={cn(
-              "text-muted-foreground hover:text-foreground shrink-0 text-sm underline underline-offset-4",
-              "transition-colors disabled:opacity-50",
-            )}
-          >
-            Edit patch
-          </button>
+          <div className="flex shrink-0 items-center gap-4">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onEdit(1)}
+              className={cn(
+                "text-muted-foreground hover:text-foreground text-sm underline underline-offset-4",
+                "transition-colors disabled:opacity-50",
+              )}
+            >
+              Edit patch
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onEdit(2)}
+              className={cn(
+                "text-muted-foreground hover:text-foreground text-sm underline underline-offset-4",
+                "transition-colors disabled:opacity-50",
+              )}
+            >
+              Change mode
+            </button>
+          </div>
         </div>
       </div>
     </div>

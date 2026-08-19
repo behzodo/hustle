@@ -1,21 +1,29 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { dark } from "@clerk/themes";
 import { useQuery } from "convex/react";
 import { PricingTable, useAuth } from "@clerk/nextjs";
 import { formatDuration, intervalToDuration } from "date-fns";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { api } from "@/../convex/_generated/api";
+import { Button } from "@/components/ui/button";
 import { useCurrentTheme } from "@/hooks/use-current-theme";
 import {
-  FREE_POINTS,
-  PRO_POINTS,
-  MAX_POINTS,
-  creditsFor,
+  CHARGE_LABELS,
+  CREDIT_COSTS,
+  PACKS,
+  TIERS,
+  formatCredits,
+  formatPrice,
   isPaidPlan,
-} from "@/lib/entitlements";
+  tierFor,
+  whatItBuys,
+  type Chargeable,
+  type Pack,
+} from "@/lib/pricing";
 
 // Hex equivalents of the oklch tokens in globals.css. Clerk's appearance
 // variables are read at runtime, so they can't reference CSS custom
@@ -40,6 +48,33 @@ const PALETTE = {
   },
 } as const;
 
+/**
+ * What a credit actually buys.
+ *
+ * The first thing on the page, and deliberately before the plans. "1,000
+ * credits" is a number nobody can price against their own month until they
+ * know that a sweep is ten of them and a site is one — and the whole argument
+ * for this pricing is that the expensive thing is finding businesses, not
+ * building for them.
+ */
+const ORDER: Chargeable[] = ["sweep", "site", "pitch", "agent"];
+
+const CostTable = () => (
+  <div className="grid w-full gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
+    {ORDER.map((kind) => (
+      <div key={kind} className="bg-card/60 px-4 py-3.5 backdrop-blur-sm">
+        <p className="text-xs text-muted-foreground">{CHARGE_LABELS[kind]}</p>
+        <p className="mt-1 text-sm font-medium tabular-nums">
+          {CREDIT_COSTS[kind]}
+          <span className="text-muted-foreground font-normal">
+            {CREDIT_COSTS[kind] === 1 ? " credit" : " credits"}
+          </span>
+        </p>
+      </div>
+    ))}
+  </div>
+);
+
 interface CreditFieldProps {
   plan: string;
   credits: number;
@@ -47,9 +82,9 @@ interface CreditFieldProps {
   accent?: boolean;
 };
 
-// One dot per build, always. Grids are sized to each plan's own allowance
-// and share a baseline, so three tiers spanning 2 to 1000 read as a chart
-// instead of three equal blocks.
+// One dot per credit, always. Grids are sized to each plan's own allowance
+// and share a baseline, so four tiers spanning 25 to 4,000 read as a chart
+// instead of four equal blocks.
 const CreditField = ({ plan, credits, columns, accent }: CreditFieldProps) => (
   <div className="flex flex-col justify-end items-center gap-y-2.5 px-5 py-4">
     <div
@@ -74,10 +109,17 @@ const CreditField = ({ plan, credits, columns, accent }: CreditFieldProps) => (
       >
         {plan}
       </span>
-      <span className="text-muted-foreground">{` · ${credits}`}</span>
+      <span className="text-muted-foreground">{` · ${formatCredits(credits)}`}</span>
     </p>
   </div>
 );
+
+// The dot grids are drawn at one pixel per credit, and Max is four thousand of
+// them. Capped so the tallest column stays a chart rather than a wall, with
+// the real number printed underneath either way.
+const DOT_CAP = 600;
+
+const dotsFor = (credits: number) => Math.min(credits, DOT_CAP);
 
 // Most people reach this page from the Upgrade button, which appears once
 // credits run low — so lead with where they actually stand.
@@ -86,41 +128,41 @@ const CreditStatus = () => {
 
   // The query returns null rather than throwing for signed-out visitors, so
   // there is nothing to gate on here.
-  const usage = useQuery(api.credits.status);
+  const balance = useQuery(api.credits.balance);
 
   const resetsIn = useMemo(() => {
-    if (!usage) return null;
+    if (!balance) return null;
 
     try {
       return formatDuration(
         intervalToDuration({
           start: new Date(),
-          end: new Date(Date.now() + usage.msBeforeNext),
+          end: new Date(Date.now() + balance.msBeforeReset),
         }),
         { format: ["months", "days", "hours"] }
       );
     } catch {
       return null;
     }
-  }, [usage]);
+  }, [balance]);
 
-  if (!usage) return null;
+  if (!balance) return null;
 
   const paid = isPaidPlan(has);
-  const total = creditsFor(has);
-  const left = Math.max(0, usage.remainingPoints);
+  const next = TIERS[TIERS.findIndex((tier) => tier.slug === tierFor(has).slug) + 1];
+  const left = Math.max(0, balance.total);
   const isOut = left <= 0;
-  const isLow = !isOut && left <= Math.max(1, Math.floor(total * 0.25));
+  const isLow = !isOut && left <= Math.max(CREDIT_COSTS.sweep, Math.floor(balance.allowance * 0.25));
 
-  const message = paid
-    ? isOut
-      ? `All ${total} builds used${resetsIn ? ` — back in ${resetsIn}` : ""}.`
-      : `${left} of ${total} builds left. Keep going.`
-    : isOut
-      ? `You're out. Pro puts ${PRO_POINTS} builds back in your hands today.`
-      : isLow
-        ? `Only ${left} build${left === 1 ? "" : "s"} left. Pro gives you ${PRO_POINTS}.`
-        : `${left} of ${total} builds left${resetsIn ? ` · resets in ${resetsIn}` : ""}.`;
+  const sites = whatItBuys(left).sites;
+
+  const message = isOut
+    ? next
+      ? `You're out. ${next.name} puts ${formatCredits(next.credits)} credits back in your hands today.`
+      : `You're out${resetsIn ? ` — back in ${resetsIn}` : ""}.`
+    : isLow && next
+      ? `${formatCredits(left)} credits left — about ${sites} more sites. ${next.name} gives you ${formatCredits(next.credits)} a month.`
+      : `${formatCredits(left)} credits left${paid ? "" : " on the free plan"}${resetsIn ? ` · resets in ${resetsIn}` : ""}.`;
 
   return (
     <p
@@ -136,10 +178,95 @@ const CreditStatus = () => {
   );
 };
 
+/**
+ * Top-ups, under the plans.
+ *
+ * Below rather than beside, on purpose. A pack is the answer to a month that
+ * ran out early, not an alternative to subscribing — it is priced above the
+ * plan rate for exactly that reason — and putting the two side by side invites
+ * somebody to work out which is cheaper when the answer is always the plan.
+ */
+const PackButton = ({ pack, busy, onBuy }: {
+  pack: Pack;
+  busy: string | null;
+  onBuy: (pack: Pack) => void;
+}) => (
+  <div className="flex flex-col gap-y-3 rounded-xl border bg-card/60 p-4 backdrop-blur-sm">
+    <div>
+      <p className="text-sm font-medium tabular-nums">{pack.name}</p>
+      <p className="text-muted-foreground mt-0.5 text-xs">
+        {formatPrice(pack.price)} once · never expires
+      </p>
+    </div>
+
+    <Button
+      size="sm"
+      variant="outline"
+      className="mt-auto h-9 rounded-lg"
+      disabled={busy !== null}
+      onClick={() => onBuy(pack)}
+    >
+      {busy === pack.slug ? "Opening Stripe…" : "Buy"}
+    </Button>
+  </div>
+);
+
+const Packs = () => {
+  // The slug of the pack being bought, so only its own button shows the
+  // pending state while the others simply lock.
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const buy = async (pack: Pack) => {
+    setBusy(pack.slug);
+
+    try {
+      const res = await fetch("/api/credits/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pack: pack.slug }),
+      });
+
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok || !body?.url) {
+        throw new Error(body?.error ?? "Could not open checkout");
+      }
+
+      // A full navigation rather than a router push: Stripe is not our app.
+      window.location.href = body.url;
+    } catch (error) {
+      // Cleared only on failure. On success the page is already navigating
+      // away, and re-enabling the button first lets somebody click it twice.
+      setBusy(null);
+      toast.error(error instanceof Error ? error.message : "Could not open checkout");
+    }
+  };
+
+  return (
+    <div className="flex w-full flex-col gap-y-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="text-sm font-medium">Need more this month?</h2>
+        <p className="text-muted-foreground text-xs">
+          One-off packs. They never expire.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {PACKS.map((pack) => (
+          <PackButton key={pack.slug} pack={pack} busy={busy} onBuy={buy} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Page = () => {
   const currentTheme = useCurrentTheme();
   const isDark = currentTheme === "dark";
   const palette = isDark ? PALETTE.dark : PALETTE.light;
+
+  const free = TIERS[0];
+  const top = TIERS[TIERS.length - 1];
 
   return (
     <div className="flex flex-col flex-1 min-h-0 max-w-5xl mx-auto w-full">
@@ -156,25 +283,32 @@ const Page = () => {
           <h1 className="headline-display font-display text-center text-balance text-5xl sm:text-6xl lg:text-7xl leading-[0.95] tracking-[-0.03em]">
             Ship{" "}
             <span className="headline-figure italic text-primary tabular-nums">
-              500&times;
+              {Math.round(top.credits / free.credits)}&times;
             </span>{" "}
             more
           </h1>
           <p className="text-muted-foreground text-center text-balance text-base md:text-lg leading-relaxed max-w-lg">
-            One credit builds one app.{" "}
+            Credits buy the work.{" "}
             <span className="text-foreground">
-              {FREE_POINTS} free a month, {PRO_POINTS} on Pro, {MAX_POINTS} on
-              Max
+              {formatCredits(free.credits)} free a month
             </span>{" "}
-            — down to 10&cent; a build.
+            — a swept patch and a handful of sites, before you pay anything.
           </p>
           <CreditStatus />
         </div>
 
+        <CostTable />
+
         <div className="flex items-stretch divide-x divide-border rounded-xl border bg-card/60 backdrop-blur-sm">
-          <CreditField plan="Free" credits={FREE_POINTS} columns={2} />
-          <CreditField plan="Pro" credits={PRO_POINTS} columns={10} />
-          <CreditField plan="Max" credits={MAX_POINTS} columns={50} accent />
+          {TIERS.map((tier, index) => (
+            <CreditField
+              key={tier.slug}
+              plan={tier.name}
+              credits={dotsFor(tier.credits)}
+              columns={Math.max(2, Math.round(Math.sqrt(dotsFor(tier.credits))))}
+              accent={index === TIERS.length - 1}
+            />
+          ))}
         </div>
 
         <div className="w-full">
@@ -194,10 +328,10 @@ const Page = () => {
                 fontFamily: "inherit",
               },
               elements: {
-                // Clerk lays plans out in two columns, which strands a third
+                // Clerk lays plans out in two columns, which strands a fourth
                 // plan alone on a second row.
                 pricingTable:
-                  "grid-cols-1! md:grid-cols-3! gap-4! max-w-none!",
+                  "grid-cols-1! md:grid-cols-2! lg:grid-cols-4! gap-4! max-w-none!",
                 pricingTableCard: "shadow-none! overflow-hidden! h-full!",
                 pricingTableCardHeader: "p-4!",
                 pricingTableCardTitle:
@@ -215,6 +349,8 @@ const Page = () => {
             }}
           />
         </div>
+
+        <Packs />
       </section>
     </div>
   );

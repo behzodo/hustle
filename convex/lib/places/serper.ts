@@ -75,6 +75,7 @@ const readPlace = (row: Record<string, unknown>): MapsPlace | null => {
     rating: num(row.rating),
     reviewCount: num(row.ratingCount),
     categories: categories(row.types, row.type),
+    photo: str(row.thumbnailUrl),
   };
 };
 

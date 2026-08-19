@@ -24,6 +24,9 @@ export interface HoverSidebarLinkItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  /** Live tally shown on the right, the way the workspace nav counts hustles.
+   *  Omitted where there is nothing to count. */
+  count?: number;
 }
 
 interface ContextValue {
@@ -161,28 +164,65 @@ export const HoverSidebarLink = ({
   link,
   active,
   className,
+  iconRef,
 }: {
   link: HoverSidebarLinkItem;
   active?: boolean;
   className?: string;
+  /**
+   * Handle on the icon itself, for anything that needs to point at this link
+   * from elsewhere on the screen.
+   *
+   * The icon rather than the whole row on purpose: the row is 260px wide when
+   * the rail is open and 40px when it is shut, so something aiming at its
+   * centre would move whenever a cursor passed nearby. The glyph does not.
+   */
+  iconRef?: React.Ref<HTMLSpanElement>;
 }) => {
   const { open, animate } = useHoverSidebar();
 
+  // Everything below the row's own colours is the treatment the workspace nav
+  // uses — see components/nav-main.tsx. Two rails in one product marking the
+  // current page two different ways reads as two products.
   return (
     <Link
       href={link.href}
       aria-current={active ? "page" : undefined}
       title={link.label}
       className={cn(
-        "group/sidebar flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors",
+        "group/sidebar relative flex items-center gap-3 overflow-hidden rounded-lg px-2.5 py-2",
+        "text-sm tracking-[-0.011em] transition-colors duration-200",
         "focus-visible:ring-ring outline-none focus-visible:ring-2",
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+          ? "bg-sidebar-accent/70 text-foreground font-medium"
+          : "text-foreground/65 hover:bg-sidebar-accent/60 hover:text-foreground",
         className,
       )}
     >
-      <span className="grid size-5 shrink-0 place-items-center">
+      {/* A polished pin on the edge and a wash falling away from it. The pin
+          is a gradient rather than a flat bar so it catches light like the
+          chrome above it, and it grows out of the edge rather than fading in —
+          moving between pages should look like one mark sliding, not two
+          marks blinking. */}
+      <span
+        aria-hidden
+        className={cn(
+          "from-foreground/90 via-foreground/60 to-foreground/25 absolute top-1/2 left-0 w-[2px] -translate-y-1/2 rounded-r-full bg-gradient-to-b transition-all duration-300 ease-out",
+          active ? "h-5 opacity-100" : "h-0 opacity-0",
+        )}
+      />
+      <span
+        aria-hidden
+        className={cn(
+          "from-foreground/[0.07] pointer-events-none absolute inset-y-0 left-0 w-3/4 bg-gradient-to-r to-transparent transition-opacity duration-300",
+          active ? "opacity-100" : "opacity-0",
+        )}
+      />
+
+      <span
+        ref={iconRef}
+        className="relative grid size-5 shrink-0 place-items-center"
+      >
         {link.icon}
       </span>
 
@@ -193,10 +233,29 @@ export const HoverSidebarLink = ({
           width: animate ? (open ? "auto" : 0) : "auto",
           opacity: animate ? (open ? 1 : 0) : 1,
         }}
-        className="overflow-hidden text-sm whitespace-pre"
+        className="relative overflow-hidden whitespace-pre"
       >
         {link.label}
       </motion.span>
+
+      {/* Collapses with the label rather than sitting on alone: a bare number
+          beside a glyph in a 64px rail reads as a badge on the icon. */}
+      {link.count !== undefined && link.count > 0 && (
+        <motion.span
+          animate={{
+            width: animate ? (open ? "auto" : 0) : "auto",
+            opacity: animate ? (open ? 1 : 0) : 1,
+          }}
+          className={cn(
+            "relative ml-auto shrink-0 overflow-hidden text-[11px] font-medium tabular-nums transition-colors",
+            active
+              ? "text-foreground/65"
+              : "text-foreground/35 group-hover/sidebar:text-foreground/55",
+          )}
+        >
+          {link.count}
+        </motion.span>
+      )}
     </Link>
   );
 };

@@ -559,6 +559,110 @@
   }
 }
 
+/* Milled pins — the run diagram on the hustle mode cards.
+
+   One pin is one business in the patch and its height is how much work goes
+   into it, so the row is the shape of the run rather than a decoration of it.
+
+   The same neutral metal as .metal-plate, turned ninety degrees: the light
+   runs across a pin's width instead of along a plate's face, which is what
+   keeps a twelve-pixel sliver reading as something round and turned rather
+   than a coloured rectangle. */
+.metal-pin {
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.4), rgb(255 255 255 / 0) 60%),
+    linear-gradient(
+      90deg,
+      #2a2c2f 0%,
+      #6c6e74 20%,
+      #a6a8ae 40%,
+      #4f5155 58%,
+      #85878d 80%,
+      #2d2f32 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.dark .metal-pin {
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0) 60%),
+    linear-gradient(
+      90deg,
+      #6e7076 0%,
+      #b9bbc2 20%,
+      #f2f3f6 40%,
+      #9c9ea5 58%,
+      #dcdee4 80%,
+      #6a6c72 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    0 2px 5px rgb(0 0 0 / 0.5);
+}
+
+/* The chosen run, in warm metal. Copper rather than the accent flat, because
+   the point of the selected state here is that the same object caught the
+   light — a different hue of the same material, not a different material. */
+.metal-pin--warm {
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 60%),
+    linear-gradient(
+      90deg,
+      #5e3626 0%,
+      #b9765c 20%,
+      #f0b49a 40%,
+      #97553f 58%,
+      #dda184 80%,
+      #5a3323 100%
+    );
+}
+
+.dark .metal-pin--warm {
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0) 60%),
+    linear-gradient(
+      90deg,
+      #a06749 0%,
+      #eab79c 20%,
+      #fff1e7 40%,
+      #c9866a 58%,
+      #f6cdb6 80%,
+      #96603f 100%
+    );
+}
+
+/* The row catches the light once as it is chosen, and never again. Same
+   single-pass reasoning as .metal-bezel: a sweep on a loop reads as a
+   progress bar, and nothing here is loading. */
+.metal-run {
+  position: relative;
+  overflow: hidden;
+}
+
+.metal-run--lit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 40%,
+    rgb(255 255 255 / 0.4) 50%,
+    transparent 60%
+  );
+  transform: translateX(-130%);
+  animation: metal-glint 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metal-run--lit::after {
+    display: none;
+  }
+}
+
 /* Section eyebrows. Only used where the label is a real nav destination. */
 .eyebrow {
   font-size: 0.7rem;
@@ -696,4 +800,104 @@
 
 .cl-pricingTableCard {
   height: 100% !important;
+}
+
+/* ── The patch gauge ──────────────────────────────────────────────────────
+   On the Pitching screen: one bar showing what has happened to every site the
+   hustle built. Written, sent, replied — and then the part that cannot be
+   filled, because the business has no email address anywhere and never will
+   have one we can find.
+
+   That last segment is knurled rather than empty. An unfilled channel reads
+   as work still to do; a machined one reads as a stop, which is what it is.
+   It is the honest headline of the whole screen and it should look like a
+   part of the instrument, not like a bar chart. */
+.gauge {
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.28),
+    inset 0 -1px 0 rgb(255 255 255 / 0.08);
+}
+
+/* Filled with the same brushed metal as the plate, so a full gauge and the
+   Send button read as the same material catching the same light. */
+.gauge-fill {
+  background-image: linear-gradient(
+    104deg,
+    #35373a 0%,
+    #6b6d73 13%,
+    #a2a4aa 27%,
+    #4e5054 41%,
+    #85878d 57%,
+    #3b3d41 75%,
+    #66686d 90%,
+    #2c2e31 100%
+  );
+}
+
+.dark .gauge-fill {
+  background-image: linear-gradient(
+    104deg,
+    #7a7c82 0%,
+    #c4c6cc 13%,
+    #f4f5f7 28%,
+    #abadb4 42%,
+    #e1e3e9 58%,
+    #92949b 76%,
+    #cbcdd4 90%,
+    #72747a 100%
+  );
+}
+
+/* Machined diagonals. 3px pitch, low contrast — at 6px tall this reads as a
+   texture rather than as stripes, which is the difference between a finish
+   and a pattern. */
+.gauge-knurl {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--foreground) 22%, transparent) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* ── Engraved labels ──────────────────────────────────────────────────────
+   Cut into the panel rather than printed on it: a dark stroke with a 1px
+   light one under it, which is what an etched line does on a metal face.
+   Only for the tiny uppercase field names — at body size the offset reads as
+   a rendering fault rather than as depth. */
+.engraved {
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.5);
+}
+
+.dark .engraved {
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.6);
+}
+
+/* A hairline of chrome down the left edge of the row you are reading. The
+   list is dense and monochrome, so the marker has to be a material change
+   rather than a colour one. */
+.rail-lit::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 2px;
+  background-image: linear-gradient(
+    180deg,
+    #35373a 0%,
+    #a2a4aa 30%,
+    #4e5054 60%,
+    #85878d 100%
+  );
+}
+
+.dark .rail-lit::before {
+  background-image: linear-gradient(
+    180deg,
+    #7a7c82 0%,
+    #f4f5f7 30%,
+    #abadb4 60%,
+    #e1e3e9 100%
+  );
 }

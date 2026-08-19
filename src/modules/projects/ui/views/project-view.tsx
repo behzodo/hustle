@@ -7,7 +7,7 @@ import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
 
 import type { Fragment, ProjectId } from "@/modules/projects/types";
 import { useMessages } from "@/modules/projects/use-projects";
-import { isPaidPlan } from "@/lib/entitlements";
+import { isPaidPlan } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 import { UserControl } from "@/components/user-control";
 import { FileExplorer } from "@/components/file-explorer";

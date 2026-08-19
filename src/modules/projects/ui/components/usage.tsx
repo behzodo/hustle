@@ -5,14 +5,19 @@ import { CrownIcon } from "lucide-react";
 import { formatDuration, intervalToDuration } from "date-fns";
 
 import { Button } from "@/components/ui/button";
-import { isPaidPlan } from "@/lib/entitlements";
+import { formatCredits, isPaidPlan } from "@/lib/pricing";
 
 interface Props {
   points: number;
   msBeforeNext: number;
+  /**
+   * Purchased credits inside `points`. Optional: the dashboard tiles still
+   * read the older `credits.status`, which cannot tell the two apart.
+   */
+  packs?: number;
 };
 
-export const Usage = ({ points, msBeforeNext }: Props) => {
+export const Usage = ({ points, msBeforeNext, packs = 0 }: Props) => {
   const { has } = useAuth();
   const hasProAccess = isPaidPlan(has);
 
@@ -31,15 +36,26 @@ export const Usage = ({ points, msBeforeNext }: Props) => {
     }
   }, [msBeforeNext]);
 
+  // Only the plan's share comes back on the reset date, so saying "resets in
+  // nine days" over a balance that is mostly bought credits is a lie in the
+  // direction that costs somebody money. When the packs are the whole of it,
+  // say the true thing instead: nothing here expires.
+  const planCredits = Math.max(0, points - packs);
+
   return (
     <div className="rounded-t-xl bg-background border border-b-0 p-2.5">
       <div className="flex items-center gap-x-2">
         <div>
           <p className="text-sm">
-            {points} {hasProAccess ? "": "free"} credits remaining
+            {formatCredits(points)} {hasProAccess ? "" : "free "}credits left
           </p>
           <p className="text-xs text-muted-foreground">
-            Resets in{" "}{resetTime}
+            {planCredits === 0
+              ? "Bought credits — these do not expire"
+              : `Resets in ${resetTime}`}
+            {packs > 0 && planCredits > 0
+              ? ` · ${formatCredits(packs)} bought`
+              : null}
           </p>
         </div>
         {!hasProAccess && (

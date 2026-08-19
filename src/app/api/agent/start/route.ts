@@ -22,11 +22,13 @@ export async function POST(req: Request) {
   // Ownership is re-checked here, not taken on trust from the client. Without
   // it anyone could spend a sandbox on someone else's project and write the
   // agent's reply into their history.
+  let project;
+
   try {
     const token = await getToken({ template: "convex" });
     if (!token) return new Response("Unauthorized", { status: 401 });
 
-    await fetchQuery(
+    project = await fetchQuery(
       api.projects.get,
       { projectId: projectId as Id<"projects"> },
       { token },
@@ -37,7 +39,10 @@ export async function POST(req: Request) {
 
   await inngest.send({
     name: "code-agent/run",
-    data: { value, projectId },
+    // The sandbox this project last built in, when it has one. The run resumes
+    // it rather than rebuilding the tree — and a bench that has since been
+    // reaped simply yields a fresh one, so a stale value here is harmless.
+    data: { value, projectId, bench: project.bench ?? null },
   });
 
   return Response.json({ ok: true });

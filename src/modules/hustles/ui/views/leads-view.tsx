@@ -36,7 +36,11 @@ import { cn } from "@/lib/utils";
 import type { ProjectId } from "@/modules/projects/types";
 import { useProjects } from "@/modules/projects/use-projects";
 import { formatRadius } from "@/modules/hustles/area";
-import { describeGap, type WebPresence } from "@/modules/hustles/discovery/lead";
+import {
+  describeEmptySweep,
+  describeGap,
+  type WebPresence,
+} from "@/modules/hustles/discovery/lead";
 import {
   huntProgress,
   useHunt,
@@ -386,14 +390,12 @@ export const LeadsView = () => {
         </Table>
 
         {leads?.length === 0 && (
-          <div className="text-muted-foreground p-10 text-center text-sm">
+          <div className="text-muted-foreground mx-auto max-w-lg p-10 text-center text-sm text-balance">
             {hunt === null || hunt === undefined
               ? "Nothing swept yet. Press start and the businesses appear here as they are found."
               : running
                 ? "Sweeping. The first results land in a few seconds."
-                : includeCovered
-                  ? "The sweep found nothing in this patch."
-                  : "Every business in this patch already has a website."}
+                : describeEmptySweep(hunt)}
           </div>
         )}
       </div>

@@ -23,6 +23,20 @@ export interface MapsPlace {
   /** Human-readable categories, e.g. ["Hair salon", "Barber shop"]. */
   categories: string[];
   /**
+   * A picture of the place, hosted by Google.
+   *
+   * Comes back on the listing for free — it is already inside the response the
+   * search was billed for, so there is no second call and no second bill. On a
+   * real sweep of Brooklyn it was present on 169 of 170 businesses, and 29 of
+   * the 30 that had no site of their own, which is the half that matters.
+   *
+   * Two hosts appear: `lh3.googleusercontent.com` for a photo somebody took,
+   * and `streetviewpixels-pa.googleapis.com` when Google falls back to Street
+   * View for a listing with none. The second is a picture of the shopfront,
+   * which for this product is not a worse answer than the first.
+   */
+  photo?: string;
+  /**
    * Whether a missing `website` actually means the business has none.
    *
    * True for anything read off a Google listing: the field is there, and an

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLinkIcon, RefreshCcwIcon } from "lucide-react";
+import { ExternalLinkIcon, GlobeIcon, RefreshCcwIcon, TimerIcon } from "lucide-react";
 
 import { Hint } from "@/components/hint";
 import type { Fragment } from "@/modules/projects/types";
@@ -13,12 +13,25 @@ export function FragmentWeb({ data }: Props) {
   const [copied, setCopied] = useState(false);
   const [fragmentKey, setFragmentKey] = useState(0);
 
+  // Two addresses, and only one of them is worth giving to anybody.
+  //
+  // `sandboxUrl` is the bench: the dev server this was built on, live and
+  // current, and parked after fifteen idle minutes. `siteUrl` is the copy in
+  // R2, which does not change until the next build and does not stop
+  // answering. So the bar shares the published one and the frame shows the
+  // live one — the address a client is sent must outlast the afternoon, and
+  // the thing on screen should be what was just built.
+  const share = data.siteUrl || data.sandboxUrl;
+  const preview = data.sandboxUrl || data.siteUrl || "";
+  const published = Boolean(data.siteUrl);
+
   const onRefresh = () => {
     setFragmentKey((prev) => prev + 1);
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(data.sandboxUrl);
+    if (!share) return;
+    navigator.clipboard.writeText(share);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -31,27 +44,39 @@ export function FragmentWeb({ data }: Props) {
             <RefreshCcwIcon />
           </Button>
         </Hint>
-        <Hint text="Click to copy" side="bottom">
+        <Hint
+          text={
+            published
+              ? "Published — click to copy. This link keeps working."
+              : "Preview only — this link stops working when the sandbox sleeps."
+          }
+          side="bottom"
+        >
           <Button 
             size="sm" 
             variant="outline" 
             onClick={handleCopy}
-            disabled={!data.sandboxUrl || copied}
+            disabled={!share || copied}
             className="flex-1 justify-start text-start font-normal"
           >
+            {published ? (
+              <GlobeIcon className="text-emerald-600 dark:text-emerald-500" />
+            ) : (
+              <TimerIcon className="text-muted-foreground" />
+            )}
             <span className="truncate">
-              {data.sandboxUrl}
+              {copied ? "Copied" : share}
             </span>
           </Button>
         </Hint>
         <Hint text="Open in a new tab" side="bottom" align="start">
           <Button
             size="sm"
-            disabled={!data.sandboxUrl}
+            disabled={!share}
             variant="outline"
             onClick={() => {
-              if (!data.sandboxUrl) return;
-              window.open(data.sandboxUrl, "_blank");
+              if (!share) return;
+              window.open(share, "_blank");
             }}
           >
             <ExternalLinkIcon />
@@ -63,7 +88,7 @@ export function FragmentWeb({ data }: Props) {
         className="h-full w-full"
         sandbox="allow-forms allow-scripts allow-same-origin"
         loading="lazy"
-        src={data.sandboxUrl}
+        src={preview}
       />
     </div>
   )

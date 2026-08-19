@@ -47,3 +47,4 @@ next-env.d.ts
 
 # Inngest local dev database (has contained API keys)
 .inngest/
+.next-verify/

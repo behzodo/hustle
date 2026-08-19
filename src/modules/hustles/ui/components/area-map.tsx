@@ -33,6 +33,7 @@ import {
   describePoint,
   hasMapbox,
   isAllowedCountry,
+  isPreciseType,
   searchPlaces,
 } from "../../geocode";
 
@@ -131,6 +132,9 @@ export const AreaMap = ({
   const [tracing, setTracing] = useState(false);
   const [tooBig, setTooBig] = useState(false);
   const [outside, setOutside] = useState(false);
+  // The pin is somewhere the geocoder cannot name a street. Advisory, not
+  // blocking — see the note where it is set.
+  const [vague, setVague] = useState(false);
   const traceRef = useRef<LatLng[] | null>(null);
 
   // A camera move asked for before the map finished loading. Mapbox silently
@@ -171,6 +175,7 @@ export const AreaMap = ({
       radiusM,
     });
     setOutside(false);
+    setVague(false);
 
     const found = await describePoint(lat, lng);
     if (!found) return;
@@ -187,6 +192,22 @@ export const AreaMap = ({
       onChangeRef.current(previous);
       return;
     }
+
+    /**
+     * The label can be a town while the pin is nowhere near one.
+     *
+     * Reverse geocoding returns the smallest feature *containing* the point,
+     * so a pin dropped in the sea inside a coastal postcode comes back named
+     * after that postcode's town and reads as a perfectly good patch. The
+     * feature type is what gives it away — a street means buildings, a
+     * postcode means the geocoder found no street to name.
+     *
+     * A warning rather than a refusal, on the same reasoning as the country
+     * check above: this is a heuristic about map data, and a heuristic must
+     * not be the thing that stops someone hunting a town they can see under
+     * their own pin.
+     */
+    setVague(!isPreciseType(found.featureType));
 
     onChangeRef.current({ ...current, label: found.label });
   }, []);
@@ -207,6 +228,7 @@ export const AreaMap = ({
 
       setTooBig(false);
       setOutside(false);
+      setVague(false);
 
       const previous = valueRef.current;
       const area: HustleArea = {
@@ -237,6 +259,10 @@ export const AreaMap = ({
         onChangeRef.current(previous);
         return;
       }
+
+      // Same check as a dropped pin — a shape traced round a bay has the same
+      // problem as a pin dropped in one.
+      setVague(!isPreciseType(found.featureType));
 
       onChangeRef.current({ ...current, label: found.label });
     },
@@ -577,9 +603,25 @@ export const AreaMap = ({
 
     searchPlaces(initialQuery)
       .then((places) => {
-        if (cancelled || !places[0] || valueRef.current) return;
+        if (cancelled || valueRef.current) return;
 
-        const place = places[0];
+        /**
+         * Only a real town seeds a patch.
+         *
+         * This is the one place an area is set without anybody looking at it,
+         * so a bad result here is a hustle that sweeps somewhere the user
+         * never chose. Someone whose town is saved as a postcode gets the
+         * first result Mapbox has that is an actual place, and if there is
+         * none they get an unseeded map saying "tap to drop a pin" — which is
+         * a smaller problem than a patch centred eighty kilometres out to sea
+         * under the right town's name.
+         */
+        const place = places.find((candidate) =>
+          isPreciseType(candidate.featureType),
+        );
+
+        if (!place) return;
+
         const area: HustleArea = {
           label: place.context ? `${place.name}, ${place.context}` : place.name,
           lat: place.lat,
@@ -623,8 +665,16 @@ export const AreaMap = ({
       ? "The US and Canada only for now — pick a patch there"
       : null;
 
+  // Advisory, and kept apart from `problem`: the patch is usable, it just
+  // probably is not where they think it is.
+  const warning =
+    !problem && vague
+      ? "No streets at this pin — it may be over water or open country. Drag it onto a town."
+      : null;
+
   const hint =
     problem ??
+    warning ??
     (mode === "draw"
       ? tracing
         ? "Let go to close the shape"
@@ -753,7 +803,11 @@ export const AreaMap = ({
                   "animate-in fade-in slide-in-from-bottom-1 rounded-full border px-4 py-2 text-sm shadow-sm backdrop-blur duration-200",
                   problem
                     ? "border-destructive/30 bg-destructive text-destructive-foreground"
-                    : "bg-background/90",
+                    : // Outlined rather than filled: this one is telling them
+                      // to look again, not refusing what they did.
+                      warning
+                      ? "border-destructive/50 bg-background/95 text-foreground"
+                      : "bg-background/90",
                 )}
               >
                 {hint}

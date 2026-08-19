@@ -33,14 +33,15 @@ export const useHunt = (projectId: ProjectId) => {
  * website included — the denominator behind "41 of 260".
  */
 export const useLeads = (
-  projectId: ProjectId,
+  /** Null when no hustle is picked — the businesses wall filters by chip. */
+  projectId: ProjectId | null,
   { limit, includeCovered }: { limit?: number; includeCovered?: boolean } = {},
 ) => {
   const { isAuthenticated } = useConvexAuth();
 
   return useQuery(
     api.discovery.leads,
-    isAuthenticated
+    isAuthenticated && projectId !== null
       ? {
           projectId,
           ...(limit === undefined ? {} : { limit }),
@@ -72,3 +73,16 @@ export const huntProgress = (hunt: { cursor: number; queries: unknown[] } | null
   hunt === null || hunt.queries.length === 0
     ? 0
     : Math.min(1, hunt.cursor / hunt.queries.length);
+
+/**
+ * The build queue, live.
+ *
+ * Same subscription model as the sweep above, and for the same reason: the
+ * screen that watches a patch being built is watching the patch being built.
+ * Every site the queue publishes patches a lead, and this re-renders.
+ */
+export const useBuildFeed = (projectId: ProjectId, take = 8) => {
+  const { isAuthenticated } = useConvexAuth();
+
+  return useQuery(api.sites.feed, isAuthenticated ? { projectId, take } : "skip");
+};

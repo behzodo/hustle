@@ -83,6 +83,8 @@ const readPlace = (row: Record<string, unknown>): MapsPlace | null => {
     // `types` is the array form of `type` and carries the secondary categories
     // a listing can have; `type` alone is only ever the first one.
     categories: categories(row.types, row.type),
+    // Same picture Serper returns, under whichever key this rendering used.
+    photo: str(row.thumbnail) ?? str(row.thumbnail_url) ?? str(row.image),
   };
 };
 

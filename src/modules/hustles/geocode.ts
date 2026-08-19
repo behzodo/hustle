@@ -23,6 +23,33 @@ export const ALLOWED_COUNTRIES = ["us", "ca"] as const;
 export const isAllowedCountry = (code: string | null) =>
   code !== null && (ALLOWED_COUNTRIES as readonly string[]).includes(code);
 
+/**
+ * Feature types precise enough to hunt from.
+ *
+ * Mapbox answers with the smallest thing that contains the point, so what it
+ * returns is a statement about what is there: a street or an address means
+ * buildings, a `place` means a town. Anything coarser means the geocoder could
+ * not find a town at all and fell back to the administrative shape around it.
+ *
+ * That distinction is not cosmetic. A postcode is returned with its centroid,
+ * and a centroid is only near the addresses when the postcode is compact —
+ * ZCTA 33037 is named for Key Largo and takes in most of Everglades National
+ * Park and Florida Bay, so its centre sits about eighty kilometres out to sea.
+ * A hustle seeded there searches open water, finds nothing, and reads as a
+ * town with no businesses in it.
+ */
+const PRECISE_TYPES = new Set([
+  "address",
+  "street",
+  "neighborhood",
+  "locality",
+  "place",
+]);
+
+/** Is this a real place, or the middle of an administrative boundary? */
+export const isPreciseType = (featureType: string | null) =>
+  featureType !== null && PRECISE_TYPES.has(featureType);
+
 export interface Place {
   /** Stable enough to key a list on; Mapbox calls it `mapbox_id`. */
   id: string;
@@ -32,6 +59,8 @@ export interface Place {
   context: string;
   lat: number;
   lng: number;
+  /** "place", "postcode", "region"… — see isPreciseType. */
+  featureType: string | null;
 }
 
 interface MapboxFeature {
@@ -43,6 +72,7 @@ interface MapboxFeature {
     full_address?: string;
     coordinates?: { longitude?: number; latitude?: number };
     context?: { country?: { country_code?: string } };
+    feature_type?: string;
   };
   geometry?: { coordinates?: [number, number] };
 }
@@ -73,6 +103,7 @@ const toPlace = (feature: MapboxFeature, index: number): Place | null => {
       "",
     lat,
     lng,
+    featureType: props.feature_type ?? null,
   };
 };
 
@@ -124,12 +155,24 @@ export const searchPlaces = async (
  * the wizard over. `country` is null when the lookup gave nothing back, which
  * callers treat as "unknown", not as "rejected" — a geocoder blip should not
  * refuse a pin the user can plainly see is in Ohio.
+ *
+ * `featureType` comes back too, because the name alone cannot be trusted to
+ * describe the pin. Reverse geocoding answers with the smallest feature that
+ * *contains* the point, so a pin in the sea inside a coastal postcode is
+ * returned named after the town that postcode belongs to — a label reading
+ * "Key Largo, Florida" over eighty kilometres of open water. The type is what
+ * gives that away: a real high street comes back "address" or "street", and
+ * water comes back "postcode".
  */
 export const describePoint = async (
   lat: number,
   lng: number,
   signal?: AbortSignal,
-): Promise<{ label: string; country: string | null } | null> => {
+): Promise<{
+  label: string;
+  country: string | null;
+  featureType: string | null;
+} | null> => {
   if (!hasMapbox) return null;
 
   const url = new URL(`${ENDPOINT}/reverse`);
@@ -151,6 +194,7 @@ export const describePoint = async (
     return {
       label: place.context ? `${place.name}, ${place.context}` : place.name,
       country: countryOf(feature),
+      featureType: place.featureType,
     };
   } catch {
     return null;

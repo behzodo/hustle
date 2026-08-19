@@ -9,19 +9,24 @@
  */
 
 import type * as credits from "../credits.js";
+import type * as crons from "../crons.js";
 import type * as discovery from "../discovery.js";
+import type * as domains from "../domains.js";
 import type * as feedback from "../feedback.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
-import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_places_index from "../lib/places/index.js";
 import type * as lib_places_overpass from "../lib/places/overpass.js";
 import type * as lib_places_scrapedo from "../lib/places/scrapedo.js";
 import type * as lib_places_serper from "../lib/places/serper.js";
 import type * as lib_places_types from "../lib/places/types.js";
+import type * as lib_pricing from "../lib/pricing.js";
+import type * as mailboxes from "../mailboxes.js";
 import type * as messages from "../messages.js";
+import type * as pitches from "../pitches.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
+import type * as sites from "../sites.js";
 
 import type {
   ApiFromModules,
@@ -31,19 +36,24 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   credits: typeof credits;
+  crons: typeof crons;
   discovery: typeof discovery;
+  domains: typeof domains;
   feedback: typeof feedback;
   http: typeof http;
   "lib/auth": typeof lib_auth;
-  "lib/entitlements": typeof lib_entitlements;
   "lib/places/index": typeof lib_places_index;
   "lib/places/overpass": typeof lib_places_overpass;
   "lib/places/scrapedo": typeof lib_places_scrapedo;
   "lib/places/serper": typeof lib_places_serper;
   "lib/places/types": typeof lib_places_types;
+  "lib/pricing": typeof lib_pricing;
+  mailboxes: typeof mailboxes;
   messages: typeof messages;
+  pitches: typeof pitches;
   profiles: typeof profiles;
   projects: typeof projects;
+  sites: typeof sites;
 }>;
 
 /**
@@ -72,6 +82,4 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {
-  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
-};
+export declare const components: {};

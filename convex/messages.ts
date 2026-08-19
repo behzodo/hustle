@@ -3,7 +3,7 @@ import { v, ConvexError } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { messageRole, messageType } from "./schema";
 import { requireUserId, requireOwnedProject } from "./lib/auth";
-import { consumeCredit } from "./credits";
+import { spend } from "./credits";
 
 // A Convex document is capped at 1 MiB. Checked a little under that so the
 // error names the real cause instead of surfacing as a platform rejection
@@ -77,7 +77,11 @@ export const send = mutation({
   handler: async (ctx, { projectId, value }) => {
     const { userId } = await requireOwnedProject(ctx, projectId);
 
-    await consumeCredit(ctx, userId);
+    // The slow lane: a sandbox for minutes and tens of thousands of OpenAI
+    // tokens. Charged before the insert, so a caller who cannot afford it
+    // never gets a message sitting in a project with no run behind it — the
+    // throw rolls the whole mutation back.
+    await spend(ctx, userId, "agent", { projectId });
 
     const messageId = await ctx.db.insert("messages", {
       projectId,
@@ -88,7 +92,9 @@ export const send = mutation({
 
     // Keeps the project at the top of the sidebar, the way Prisma's
     // @updatedAt did implicitly on every write.
-    await ctx.db.patch(projectId, { updatedAt: Date.now() });
+    await ctx.db.patch(projectId, {
+      updatedAt: Date.now(),
+    });
 
     return messageId;
   },
@@ -111,11 +117,17 @@ export const recordResult = internalMutation({
         sandboxUrl: v.string(),
         title: v.string(),
         files: v.record(v.string(), v.string()),
+        // Set when this build was also copied out to R2. The sandbox URL
+        // beside it is the live bench and stops answering within the hour;
+        // this one is what may be given to somebody.
+        siteUrl: v.optional(v.string()),
       }),
     ),
+    // The sandbox this run worked in, so the next one can pick it back up.
+    bench: v.optional(v.object({ id: v.string(), provider: v.string() })),
   },
   returns: v.id("messages"),
-  handler: async (ctx, { projectId, content, type, fragment }) => {
+  handler: async (ctx, { projectId, content, type, fragment, bench }) => {
     if (fragment !== undefined) {
       const bytes = new TextEncoder().encode(JSON.stringify(fragment.files)).length;
 
@@ -141,7 +153,26 @@ export const recordResult = internalMutation({
       await ctx.db.insert("fragments", { messageId, ...fragment });
     }
 
-    await ctx.db.patch(projectId, { updatedAt: Date.now() });
+    const project = await ctx.db.get(projectId);
+
+    // The slug was claimed before the upload started, so by the time a
+    // published URL comes back the project already carries it. What is new is
+    // that something is actually there now — which is the difference between
+    // a name reserved and a link worth sending, and the only thing the rest of
+    // the app should treat as "this hustle has a site".
+    const published =
+      fragment?.siteUrl !== undefined && project?.site !== undefined
+        ? { site: { ...project.site, publishedAt: Date.now() } }
+        : {};
+
+    await ctx.db.patch(projectId, {
+      updatedAt: Date.now(),
+      // Recorded even when the run failed. A build that broke still leaves a
+      // bench with the work on it, and picking that up is more useful than
+      // starting the next attempt from an empty tree.
+      ...(bench === undefined ? {} : { bench }),
+      ...published,
+    });
 
     return messageId;
   },
