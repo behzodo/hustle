@@ -511,6 +511,29 @@ export default defineSchema({
       }),
     ),
 
+    // The invoice, once one has been raised.
+    //
+    // Kept on the pitch rather than looked up from Stripe, because the screen
+    // shows it on every render and Stripe is a network call. The amount and
+    // the fee are stored rather than recomputed for a harder reason: a price
+    // band can be changed on the profile afterwards, and what was billed must
+    // not move when it is.
+    invoice: v.optional(
+      v.object({
+        id: v.string(),
+        /** The page the business pays on. Works in a text as well as an email. */
+        url: v.string(),
+        number: v.optional(v.string()),
+        /** In the smallest unit of the currency below. */
+        amount: v.number(),
+        currency: v.string(),
+        /** The platform's share, in the same unit. */
+        fee: v.number(),
+        raisedAt: v.number(),
+        paidAt: v.optional(v.number()),
+      }),
+    ),
+
     sentAt: v.optional(v.number()),
     // Set while `status` is "sending"; see pitchStatus.
     startedAt: v.optional(v.number()),

@@ -261,11 +261,13 @@ export const fetchOpenPitches = (projectId: string) =>
       business: string;
       siteUrl: string;
       rfcId?: string;
+      invoiced: boolean;
       sender: {
         tradingName: string;
         city?: string;
         tone?: string;
         priceBand?: string;
+        stripeAccountId?: string;
       };
     }[];
   }>("/pitch/open", { projectId });
@@ -300,11 +302,13 @@ export const findInboundPitch = (body: { from: string; to: string }) =>
       business?: string;
       siteUrl?: string;
       thread: { side: "us" | "them"; text: string; at: number }[];
+      invoiced: boolean;
       sender: {
         tradingName: string;
         city?: string;
         tone?: string;
         priceBand?: string;
+        stripeAccountId?: string;
       };
     } | null;
   }>("/pitch/inbound", body);
@@ -315,3 +319,22 @@ export const appendPitchMessage = (body: {
   side: "us" | "them";
   text: string;
 }) => call<{ ok: boolean }>("/pitch/append", body);
+
+/**
+ * Files an invoice against the pitch that produced it.
+ *
+ * Returns false when the pitch already had one, which is not an error — it is
+ * the guard against raising a second invoice for the same job, and the caller
+ * uses it to decide whether to send the link.
+ */
+export const recordPitchInvoice = (body: {
+  pitchId: string;
+  invoice: {
+    id: string;
+    url: string;
+    number?: string;
+    amount: number;
+    currency: string;
+    fee: number;
+  };
+}) => call<{ recorded: boolean }>("/pitch/invoice", body);

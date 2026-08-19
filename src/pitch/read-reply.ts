@@ -50,7 +50,17 @@ const STOP =
   /\b(?:unsubscribe|no\s+thanks?|not\s+interested|remove\s+me|take\s+me\s+off|do\s*n[o']?t\s+(?:contact|email|write)|stop\s+(?:emailing|contacting)|leave\s+me\s+alone|piss\s+off|fuck\s+off)\b/i;
 
 export type Verdict =
-  /** Wants it. Send the invoice. */
+  /**
+   * Agreed. Raise the invoice.
+   *
+   * Split out from `keen` for one reason, and it is not a technicality: the
+   * classifier was already reading "how much is it?" as keen, correctly, and
+   * an invoice raised in answer to somebody asking the price is a way of
+   * losing a job that was about to happen. Interest is not a yes. This is the
+   * yes.
+   */
+  | "deal"
+  /** Interested — asking the price, asking what is involved. Answer, do not bill. */
   | "keen"
   /** Wants the site changed before they commit. Back to the build lane. */
   | "changes"
@@ -66,7 +76,7 @@ export type Verdict =
   | "bounced";
 
 const VerdictSchema = z.object({
-  verdict: z.enum(["keen", "changes", "question", "cool"]),
+  verdict: z.enum(["deal", "keen", "changes", "question", "cool"]),
   /** One line, in the reader's own words where possible. Shown on the card. */
   gist: z.string().trim().max(140),
   /**
@@ -89,14 +99,17 @@ export interface Reading {
 
 const SYSTEM = `You read one reply from a local business owner to a cold email offering them a website that has already been built for them.
 
-Decide which of four things it is:
+Decide which of five things it is:
 
-- "keen": they want it, or want to talk about buying it. Includes "how much?", "yes", "call me", "send me the details".
+- "deal": they have agreed. "Yes let's do it", "send me the invoice", "how do I pay", "I'll take it", "go ahead". An instruction to proceed, not a question.
+- "keen": interested, but still asking. "How much?", "what's involved?", "can you call me?", "send me the details". Wanting to know the price is NOT agreeing to it.
 - "changes": they like it enough to say what is wrong with it. Anything about the site itself — wrong hours, wrong services, an old photo, a name spelled wrong, wanting a page added.
 - "question": they are asking something that is not about buying. Who are you, where did you get my address, is this real.
 - "cool": they are not interested and have not asked to be left alone.
 
-"how much is it" is keen, not question. Somebody asking the price is somebody considering it.
+"How much is it" is keen, not deal and not question. Somebody asking the price has not agreed to it — and an invoice sent to somebody who asked a question loses the job.
+
+Only choose "deal" when they have told you to go ahead. If you are weighing "deal" against "keen", it is "keen".
 A reply that is both — "looks good but the phone number is wrong, how much?" — is "changes". The site has to be right before anything else happens.
 
 Be literal. Do not read enthusiasm into politeness; a lot of people are polite while saying no.`;

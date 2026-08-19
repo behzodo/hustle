@@ -58,6 +58,18 @@ const pitchShape = v.object({
     }),
   ),
   sms: v.optional(v.object({ messageSid: v.string(), from: v.string() })),
+  invoice: v.optional(
+    v.object({
+      id: v.string(),
+      url: v.string(),
+      number: v.optional(v.string()),
+      amount: v.number(),
+      currency: v.string(),
+      fee: v.number(),
+      raisedAt: v.number(),
+      paidAt: v.optional(v.number()),
+    }),
+  ),
   thread: v.array(
     v.object({
       side: v.union(v.literal("us"), v.literal("them")),
@@ -714,6 +726,53 @@ export const setEmail = mutation({
   },
 });
 
+/**
+ * One pitch, with the sender's Stripe account, for raising an invoice by hand.
+ *
+ * Its own query because the invoice route needs three things from two tables
+ * and has to prove ownership of both — and because everything it returns is a
+ * thing the automatic path already gets from `awaitingReply`. This is the same
+ * answer for somebody pressing a button.
+ */
+export const forInvoice = query({
+  args: { pitchId: v.id("pitches") },
+  returns: v.union(
+    v.object({
+      business: v.string(),
+      siteUrl: v.string(),
+      channel: pitchChannel,
+      to: v.string(),
+      invoiced: v.boolean(),
+      tradingName: v.string(),
+      priceBand: v.optional(v.string()),
+      stripeAccountId: v.optional(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { pitchId }) => {
+    const userId = await requireUserId(ctx);
+    const pitch = await ctx.db.get(pitchId);
+
+    if (!pitch || pitch.userId !== userId) return null;
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    return {
+      business: pitch.business,
+      siteUrl: pitch.siteUrl,
+      channel: pitch.channel,
+      to: pitch.to,
+      invoiced: Boolean(pitch.invoice),
+      tradingName: profile?.tradingName ?? "",
+      priceBand: profile?.priceBand,
+      stripeAccountId: profile?.stripeAccountId,
+    };
+  },
+});
+
 /** Says how it ended, when a person decides rather than a reply. */
 export const setStatus = mutation({
   args: {
@@ -754,11 +813,13 @@ export const awaitingReply = internalQuery({
       business: v.string(),
       siteUrl: v.string(),
       rfcId: v.optional(v.string()),
+      invoiced: v.boolean(),
       sender: v.object({
         tradingName: v.string(),
         city: v.optional(v.string()),
         tone: v.optional(v.string()),
         priceBand: v.optional(v.string()),
+        stripeAccountId: v.optional(v.string()),
       }),
     }),
   ),
@@ -783,6 +844,7 @@ export const awaitingReply = internalQuery({
       city: profile?.city,
       tone: profile?.tone,
       priceBand: profile?.priceBand,
+      stripeAccountId: profile?.stripeAccountId,
     };
 
     return open.map((pitch) => ({
@@ -796,6 +858,7 @@ export const awaitingReply = internalQuery({
       business: pitch.business,
       siteUrl: pitch.siteUrl,
       rfcId: pitch.gmail!.rfcId,
+      invoiced: Boolean(pitch.invoice),
       sender,
     }));
   },
@@ -836,7 +899,10 @@ export const inboundContext = internalQuery({
         city: v.optional(v.string()),
         tone: v.optional(v.string()),
         priceBand: v.optional(v.string()),
+        stripeAccountId: v.optional(v.string()),
       }),
+      /** Set when an invoice has already been raised. Never raise a second. */
+      invoiced: v.boolean(),
     }),
     v.null(),
   ),
@@ -868,8 +934,48 @@ export const inboundContext = internalQuery({
         city: profile.city,
         tone: profile.tone,
         priceBand: profile.priceBand,
+        stripeAccountId: profile.stripeAccountId,
       },
+      invoiced: Boolean(pitch?.invoice),
     };
+  },
+});
+
+/**
+ * Files the invoice against the pitch that produced it.
+ *
+ * Refuses to overwrite one. Raising a second invoice for the same job is the
+ * kind of mistake that is only discovered when a business pays both, and the
+ * automatic path can be reached twice — a reply arriving while the previous
+ * one is still being answered is exactly the case.
+ */
+export const recordInvoice = internalMutation({
+  args: {
+    pitchId: v.id("pitches"),
+    invoice: v.object({
+      id: v.string(),
+      url: v.string(),
+      number: v.optional(v.string()),
+      amount: v.number(),
+      currency: v.string(),
+      fee: v.number(),
+    }),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, { pitchId, invoice }) => {
+    const pitch = await ctx.db.get(pitchId);
+    if (!pitch) return false;
+    if (pitch.invoice) return false;
+
+    await ctx.db.patch(pitchId, {
+      invoice: { ...invoice, raisedAt: Date.now() },
+      // Won the moment the invoice goes out, not when it is paid. The two are
+      // different questions and only one of them is this screen's.
+      status: "won",
+      updatedAt: Date.now(),
+    });
+
+    return true;
   },
 });
 

@@ -147,13 +147,25 @@ export const askJson = async <T>(
 ): Promise<JsonResult<T>> => {
   let complaint = "";
 
+  // Groq refuses JSON mode outright unless the word "json" appears somewhere
+  // in the messages: a 400 reading "'messages' must contain the word 'json'
+  // in some form". Most prompts here happen to say "Return JSON" and pass by
+  // luck. The reply classifier did not, so it worked on the first two
+  // providers and died on the third — the worst kind of intermittent, since
+  // the third is only reached when the first two are rate-limited. Added
+  // once here rather than remembered in every prompt.
+  const speaksJson = /json/i.test(`${options.system} ${options.user}`);
+  const asked = speaksJson
+    ? options.user
+    : `${options.user}\n\nAnswer with JSON, and nothing else.`;
+
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const answer = await ask({
       ...options,
       json: true,
       user: complaint
-        ? `${options.user}\n\nYour last answer was rejected: ${complaint}\nReturn corrected JSON, and nothing else.`
-        : options.user,
+        ? `${asked}\n\nYour last answer was rejected: ${complaint}\nReturn corrected JSON, and nothing else.`
+        : asked,
     });
 
     try {

@@ -14,7 +14,8 @@
     "site:build": "tsx --conditions=react-server --env-file=.env --env-file=.env.local scripts/fast-site.ts",
     "site:queue": "tsx --conditions=react-server --env-file=.env --env-file=.env.local scripts/site-queue.ts",
     "pitch:check": "tsx --conditions=react-server --env-file=.env --env-file=.env.local scripts/pitch-check.ts",
-    "pitch:queue": "tsx --conditions=react-server --env-file=.env --env-file=.env.local scripts/pitch-queue.ts"
+    "pitch:queue": "tsx --conditions=react-server --env-file=.env --env-file=.env.local scripts/pitch-queue.ts",
+    "verdict:check": "tsx --conditions=react-server --env-file=.env --env-file=.env.local scripts/verdict-check.ts"
   },
   "dependencies": {
     "@ai-sdk/groq": "^4.0.28",

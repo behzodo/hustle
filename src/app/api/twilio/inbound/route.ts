@@ -2,6 +2,7 @@ import { appendPitchMessage, findInboundPitch, recordPitchReply } from "@/innges
 import { writeAnswer } from "@/pitch/answer";
 import { readReply } from "@/pitch/read-reply";
 import { authTokenFor, sendText, signatureValid } from "@/pitch/twilio";
+import { closeIfAgreed } from "@/pay/close";
 
 /**
  * A text arriving from a business, and the answer going back.
@@ -78,6 +79,24 @@ export async function POST(request: Request) {
     gist: reading.gist,
   });
 
+  // The invoice, when they have actually agreed rather than merely asked. It
+  // is raised before the reply is written so the link can go in the same text
+  // — two messages a second apart read as a bot, and one reads as a person who
+  // had it ready.
+  const closed = await closeIfAgreed({
+    pitchId: found.pitchId,
+    verdict: reading.verdict,
+    business: found.business,
+    siteUrl: found.siteUrl,
+    channel: "sms",
+    to: from,
+    invoiced: found.invoiced,
+    sender: found.sender,
+  }).catch((cause) => {
+    console.error("[pitch] could not raise an invoice:", cause);
+    return null;
+  });
+
   const answer = await writeAnswer({
     verdict: reading.verdict,
     thread,
@@ -89,17 +108,19 @@ export async function POST(request: Request) {
 
   // No answer, or one the checker refused. Both leave the reply filed and
   // unanswered, which is a conversation waiting for a person rather than a
-  // wrong thing sent quickly.
+  // wrong thing sent quickly. The invoice still stands — it is raised, it is
+  // recorded, and the screen shows it.
   if (!answer || answer.blocked) return NOTHING;
 
-  try {
-    await sendText(found.connectionId, { to: from, from: to, body: answer.body });
+  // The invoice line goes on the end of the answer rather than after it, so
+  // the business gets one text with everything in it. Two messages a second
+  // apart read as a bot; one reads as somebody who had it ready.
+  const body = closed ? [answer.body, closed.line].join("\n\n") : answer.body;
 
-    await appendPitchMessage({
-      pitchId: found.pitchId,
-      side: "us",
-      text: answer.body,
-    });
+  try {
+    await sendText(found.connectionId, { to: from, from: to, body });
+
+    await appendPitchMessage({ pitchId: found.pitchId, side: "us", text: body });
   } catch (cause) {
     console.error("[pitch] could not answer a text:", cause);
   }

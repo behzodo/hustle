@@ -15,6 +15,7 @@ import { findEmail, readReply, readThread, sendMail, writePitch } from "@/pitch"
 import { routeFor, whyUnreachable } from "@/pitch/channels";
 import { sendText, toE164 } from "@/pitch/twilio";
 import { writeAnswer } from "@/pitch/answer";
+import { closeIfAgreed } from "@/pay/close";
 import { appendPitchMessage } from "@/inngest/convex";
 
 /**
@@ -423,6 +424,22 @@ export const checkReplies = async (
     // reply while they are still thinking about it.
     if (!pitch.business || !pitch.siteUrl || !pitch.sender) continue;
 
+    // Raised before the reply is written, so the answer can say the invoice is
+    // on its way and be telling the truth when it does.
+    const closed = await closeIfAgreed({
+      pitchId: pitch.pitchId,
+      verdict: reading.verdict,
+      business: pitch.business,
+      siteUrl: pitch.siteUrl,
+      channel: "email",
+      to: pitch.to,
+      invoiced: pitch.invoiced,
+      sender: pitch.sender,
+    }).catch((cause) => {
+      console.error(`[pitch] could not invoice ${pitch.business}:`, cause);
+      return null;
+    });
+
     const answer = await writeAnswer({
       verdict: reading.verdict,
       thread,
@@ -441,7 +458,7 @@ export const checkReplies = async (
       await sendMail(connectionId, {
         to: pitch.to,
         subject: pitch.subject.startsWith("Re:") ? pitch.subject : `Re: ${pitch.subject}`,
-        body: answer.body,
+        body: closed ? [answer.body, closed.line].join("\n\n") : answer.body,
         from: { email: us },
         replyTo: { threadId: pitch.threadId, rfcId: pitch.rfcId },
       });

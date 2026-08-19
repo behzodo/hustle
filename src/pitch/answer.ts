@@ -31,7 +31,7 @@ import type { Verdict } from "./read-reply";
  */
 
 /** Verdicts a machine may answer on its own. */
-const ANSWERABLE: Verdict[] = ["keen", "question", "changes", "cool"];
+const ANSWERABLE: Verdict[] = ["deal", "keen", "question", "changes", "cool"];
 
 export const canAnswer = (verdict: Verdict) => ANSWERABLE.includes(verdict);
 
@@ -48,6 +48,7 @@ const AnswerSchema = z.object({
  * instead of the person.
  */
 const BRIEF: Record<Verdict, string> = {
+  deal: `They have agreed. Say you will get started, and tell them the invoice is on its way and that the site moves to their own name once it is paid. Two sentences. Do not re-sell it, do not add conditions they have not heard, and do not ask another question — they have said yes and every extra sentence is a chance to change their mind.`,
   keen: `They are interested. Confirm you can do it, say what happens next in one step, and ask the one question you actually need answered to move — usually whether they want it on their own domain name. If you were told a price, give it plainly. If you were not, say you will send the number rather than inventing one.`,
   question: `They asked something. Answer it directly in the first sentence. Do not sell. If the question is how you got their details, the true answer is that their business is on Google Maps with no website listed, and saying so plainly is better than being vague about it.`,
   changes: `They want the site changed. Thank them for the specifics, say you will make the change, and confirm nothing else. Do not promise a date. Do not ask them to approve anything yet.`,

@@ -14,6 +14,7 @@ import {
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
   ProhibitIcon,
+  ReceiptIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 
@@ -275,6 +276,127 @@ const Field = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
+/**
+ * The invoice, or the button that makes one.
+ *
+ * The last thing that happens in this product and the only one that moves
+ * money, so it gets the one plate of chrome in the reading pane — the same
+ * material as Send in the column, and for the same reason: both put something
+ * beyond reach.
+ *
+ * The figure is editable before it goes. A price band is a range and an
+ * invoice is a number, and the person who agreed the job knows which number
+ * they agreed better than the profile does.
+ */
+const Invoice = ({ pitch }: { pitch: Pitch }) => {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const raise = async () => {
+    if (
+      !window.confirm(
+        `Raise an invoice to ${pitch.business}? It is finalised at Stripe the moment you do.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const res = await fetch(`/api/pitch/${pitch._id}/invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(amount ? { amount: Number(amount) } : {}),
+      });
+      const body = await res.json();
+
+      if (!res.ok) throw new Error(body.error ?? "Stripe refused it");
+
+      toast.success(
+        body.emailed
+          ? `Invoice for ${body.shown} sent to ${pitch.to}`
+          : `Invoice for ${body.shown} raised — the link is on the card`,
+      );
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "That did not work");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (pitch.invoice) {
+    const shown = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: pitch.invoice.currency.toUpperCase(),
+      maximumFractionDigits: 0,
+    }).format(pitch.invoice.amount / 100);
+
+    return (
+      <div className="border-border/60 milled mt-8 max-w-[58ch] rounded-lg border p-4">
+        <p className="engraved text-muted-foreground/70 text-[9px] tracking-[0.28em] uppercase">
+          Invoice {pitch.invoice.number ?? ""}
+        </p>
+
+        <p className="font-display headline-display mt-2 text-2xl tracking-[-0.02em] tabular-nums">
+          {shown}
+        </p>
+
+        <p className="text-muted-foreground/70 mt-1 font-mono text-[10px]">
+          {pitch.invoice.paidAt ? "Paid" : "Awaiting payment"} · your share{" "}
+          {new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: pitch.invoice.currency.toUpperCase(),
+            maximumFractionDigits: 0,
+          }).format((pitch.invoice.amount - pitch.invoice.fee) / 100)}
+        </p>
+
+        <Button size="sm" variant="outline" className="mt-3 h-7 text-xs" asChild>
+          <a href={pitch.invoice.url} target="_blank" rel="noopener noreferrer">
+            <ArrowSquareOutIcon className="size-3.5" />
+            Open the payment page
+          </a>
+        </Button>
+      </div>
+    );
+  }
+
+  // Only once there is a conversation. An invoice raised against a business
+  // that has not answered is a bill sent to a stranger.
+  if (pitch.status !== "replied" && pitch.status !== "sent" && pitch.status !== "won") {
+    return null;
+  }
+
+  return (
+    <div className="border-border/60 mt-8 flex max-w-[58ch] flex-wrap items-center gap-2 rounded-lg border border-dashed p-3">
+      <ReceiptIcon className="text-muted-foreground/60 size-4 shrink-0" />
+      <span className="text-muted-foreground text-xs">Agreed a price?</span>
+
+      <div className="relative">
+        <span className="text-muted-foreground/60 absolute top-1/2 left-2 -translate-y-1/2 text-xs">
+          $
+        </span>
+        <Input
+          value={amount}
+          onChange={(event) => setAmount(event.target.value.replace(/[^\d.]/g, ""))}
+          placeholder="900"
+          className="h-7 w-24 pl-5 text-xs"
+          inputMode="decimal"
+        />
+      </div>
+
+      <Button
+        size="sm"
+        className="metal-plate h-7 border-0 bg-transparent text-xs shadow-none dark:bg-transparent"
+        onClick={() => void raise()}
+        disabled={busy}
+      >
+        Raise the invoice
+      </Button>
+    </div>
+  );
+};
+
 const Reader = ({ pitch }: { pitch: Pitch }) => {
   const edit = useEditPitch();
   const setStatus = useSetPitchStatus();
@@ -448,6 +570,8 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
               </ul>
             </details>
           )}
+
+          <Invoice pitch={pitch} />
 
           {pitch.write && (
             <p className="text-muted-foreground/50 mt-5 font-mono text-[10px]">

@@ -362,6 +362,22 @@ http.route({
 });
 
 http.route({
+  path: "/pitch/invoice",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const recorded = await ctx.runMutation(internal.pitches.recordInvoice, {
+      pitchId: body.pitchId,
+      invoice: body.invoice,
+    });
+
+    return Response.json({ recorded });
+  }),
+});
+
+http.route({
   path: "/pitch/append",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
