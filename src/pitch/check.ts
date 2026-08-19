@@ -116,16 +116,6 @@ export interface PitchSubject {
   /** Set when the profile has a price band, which is the only time a number is allowed. */
   pricing?: boolean;
   /**
-   * Which channel this is going out on. Defaults to email.
-   *
-   * It changes two rules and no others. Length is measured in characters
-   * rather than words, because a text is billed by the segment and 160 is a
-   * hard edge rather than a preference. And a text may leave the business's
-   * name out: it is 300 characters long, the recipient knows who they are, and
-   * the name that has to be in it is the sender's.
-   */
-  channel?: "email" | "sms" | "instagram" | "facebook";
-  /**
    * Set when this is an answer rather than an opening message.
    *
    * Drops two rules and keeps every other one. The link is not required,
@@ -151,10 +141,8 @@ export const checkPitch = ({
   business,
   siteUrl,
   pricing,
-  channel = "email",
   reply = false,
 }: PitchSubject): PitchProblem[] => {
-  const texting = channel === "sms";
   const problems: PitchProblem[] = [];
   const say = (field: string, severity: PitchSeverity, message: string) =>
     problems.push({ field, severity, message });
@@ -201,32 +189,19 @@ export const checkPitch = ({
   // shop's name is indistinguishable from one sent to ten thousand shops.
   const first = business.split(/[\s|,–-]/)[0];
 
-  if (!texting && !reply && first.length > 2 && !new RegExp(escape(first), "i").test(body)) {
+  if (!reply && first.length > 2 && !new RegExp(escape(first), "i").test(body)) {
     say("body", "soft", "never says the business's name");
   }
 
   /* ---- shape ---- */
 
-  if (texting) {
-    // Segments, not words. 160 GSM-7 characters is one text; past it the
-    // carrier bills two, and past 320 it bills three. The sign-off is already
-    // on the body by the time this runs, so the ceiling here is the real one.
-    if (body.length > 320) {
-      say("body", "bad", `${body.length} characters — that is three texts, not one`);
-    } else if (body.length > 160) {
-      say("body", "soft", `${body.length} characters — billed as two texts`);
-    }
+  const count = words(body);
 
-    if (body.length < 60) say("body", "soft", "too short to say who is writing");
-  } else {
-    const count = words(body);
-
-    if (count < WORDS_MIN && !reply) {
-      say("body", "soft", `too short at ${count} words`);
-    }
-    if (count > WORDS_MAX) {
-      say("body", "soft", `too long at ${count} words — a phone shows about 60`);
-    }
+  if (count < WORDS_MIN && !reply) {
+    say("body", "soft", `too short at ${count} words`);
+  }
+  if (count > WORDS_MAX) {
+    say("body", "soft", `too long at ${count} words — a phone shows about 60`);
   }
 
   if ((body.match(/!/g) ?? []).length > 0) say("body", "soft", "uses an exclamation mark");

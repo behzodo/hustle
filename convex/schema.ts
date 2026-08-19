@@ -45,20 +45,6 @@ export const huntQueryValidator = v.object({
   zoom: v.number(),
 });
 
-// How a pitch reaches the business.
-//
-// Email is what a Google listing never gives us and SMS is what it always
-// does, which is the whole reason there is more than one of these. The two
-// social channels can only ever carry a reply — Meta does not permit a
-// business to message somebody who has not messaged it first — so a pitch is
-// never created on one; a thread simply arrives there.
-export const pitchChannel = v.union(
-  v.literal("email"),
-  v.literal("sms"),
-  v.literal("instagram"),
-  v.literal("facebook"),
-);
-
 // Where a pitch has got to.
 //
 // "sending" is a claim rather than a fact, the same as a lead's "building":
@@ -266,27 +252,6 @@ export const profileFields = {
   // Stripe connected account id, once they finish Connect onboarding.
   stripeAccountId: v.optional(v.string()),
 
-  // Their own Twilio account, connected through our screen.
-  //
-  // White-label by construction rather than by branding: the credentials are
-  // theirs, the number is bought on their account, and the bill and the
-  // sending reputation are theirs too. We hold a Nango connection id and the
-  // number we provisioned, and nothing else — no SID, no auth token.
-  twilioConnectionId: v.optional(v.string()),
-  // The number texts go out from, in E.164. Absent until one is bought.
-  twilioNumber: v.optional(v.string()),
-  // Twilio's id for it, so it can be released or re-pointed later.
-  twilioNumberSid: v.optional(v.string()),
-
-  // Meta, for the inbox rather than for outreach.
-  //
-  // Neither of these can start a conversation: the Instagram and Facebook
-  // messaging APIs only permit a reply, and only inside the window that
-  // opens when a person messages the business first. See CAN_START in
-  // src/lib/nango.ts. They are here so that a business that saw its site and
-  // answered on Instagram lands in the same inbox as everyone else.
-  instagramConnectionId: v.optional(v.string()),
-  facebookConnectionId: v.optional(v.string()),
 };
 
 export default defineSchema({
@@ -448,15 +413,9 @@ export default defineSchema({
     // than read off the lead because this is the link that was actually sent.
     siteUrl: v.string(),
 
-    // The address, the phone number, or the handle — whichever the channel
-    // below needs. One column rather than three, because a pitch has exactly
-    // one destination and three nullable ones would only ever disagree.
     to: v.string(),
-    // Empty for SMS and for a DM, which have no such thing. Kept required so
-    // nothing has to branch on its absence to render a row.
     subject: v.string(),
     body: v.string(),
-    channel: pitchChannel,
     status: pitchStatus,
 
     // Gmail's own ids, once it has accepted the message.
@@ -475,17 +434,6 @@ export default defineSchema({
       }),
     ),
 
-    // Twilio's id for the outbound text, and the number it went out from.
-    //
-    // The number is stored on the pitch rather than read off the profile,
-    // because a user who changes number later still needs the thread that was
-    // started on the old one to keep matching inbound replies to it.
-    sms: v.optional(
-      v.object({
-        messageSid: v.string(),
-        from: v.string(),
-      }),
-    ),
 
     // The conversation, oldest first — ours and theirs in one list, because
     // the screen reads it top to bottom and a split would have to be merged
@@ -559,7 +507,6 @@ export default defineSchema({
     // is the number it came from. Scoped by user because two of them working
     // neighbouring towns can hold the same business, and the reply belongs to
     // whichever of them actually texted it.
-    .index("by_user_and_to", ["userId", "to"])
     // Every open conversation across every hustle, for the minute-by-minute
     // poll. Not scoped to a project, because the cron does not know which
     // projects have anything waiting until it looks.
@@ -587,11 +534,7 @@ export default defineSchema({
     siteUrl: v.optional(v.string()),
   }).index("by_message", ["messageId"]),
 
-  profiles: defineTable(profileFields)
-    .index("by_user", ["userId"])
-    // An inbound text carries the number it was sent to and nothing else,
-    // so that number is the only way back to whose account it belongs to.
-    .index("by_twilio_number", ["twilioNumber"]),
+  profiles: defineTable(profileFields).index("by_user", ["userId"]),
 
   feedback: defineTable({
     userId: v.string(),

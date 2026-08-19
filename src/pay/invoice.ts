@@ -54,9 +54,8 @@ export interface RaiseInvoice {
   siteUrl: string;
   /** Amount in cents. Defaults to the profile's band. */
   amount: number;
-  /** Theirs, when the conversation happened by email. */
+  /** Theirs. Stripe needs one to deliver the invoice. */
   email?: string;
-  phone?: string;
   /** Signs the line item, so the invoice reads as theirs and not as ours. */
   tradingName: string;
 }
@@ -86,7 +85,6 @@ export const raiseInvoice = async ({
   siteUrl,
   amount,
   email,
-  phone,
   tradingName,
 }: RaiseInvoice): Promise<RaisedInvoice> => {
   const stripe = getStripe();
@@ -99,7 +97,6 @@ export const raiseInvoice = async ({
   const customer = await stripe.customers.create({
     name: business,
     ...(email ? { email } : {}),
-    ...(phone ? { phone } : {}),
     metadata: { business, siteUrl, forAccount: accountId },
   });
 

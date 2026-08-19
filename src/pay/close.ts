@@ -29,8 +29,7 @@ export interface Closing {
   verdict: Verdict;
   business: string;
   siteUrl: string;
-  channel: "email" | "sms" | "instagram" | "facebook";
-  /** Where the conversation happened — an address or a number. */
+  /** The address the conversation happened at. */
   to: string;
   invoiced: boolean;
   sender: {
@@ -59,16 +58,13 @@ export const closeIfAgreed = async (closing: Closing): Promise<Closed | null> =>
   if (!closing.sender.stripeAccountId) return null;
 
   const amount = closing.amount ?? priceFor(closing.sender.priceBand);
-  const email = closing.channel === "email" ? closing.to : undefined;
-  const phone = closing.channel === "sms" ? closing.to : undefined;
 
   const invoice = await raiseInvoice({
     accountId: closing.sender.stripeAccountId,
     business: closing.business,
     siteUrl: closing.siteUrl,
     amount,
-    email,
-    phone,
+    email: closing.to,
     tradingName: closing.sender.tradingName,
   });
 
@@ -89,18 +85,15 @@ export const closeIfAgreed = async (closing: Closing): Promise<Closed | null> =>
   // in a client's inbox is a phone call.
   if (!recorded) return null;
 
-  // Stripe emails it where there is an address to email. A business reached by
-  // text gets the link in the text below, because Stripe cannot send an
-  // invoice to a phone number.
-  if (email) await emailInvoice(invoice.id).catch(() => {});
+  // Stripe delivers it. The line below only tells them it is coming, so the
+  // reply and the invoice are not two separate surprises.
+  await emailInvoice(invoice.id).catch(() => {});
 
   const shown = money(invoice.amount, invoice.currency);
 
   return {
     url: invoice.url,
     amount: invoice.amount,
-    line: email
-      ? `The invoice for ${shown} is on its way to ${email}.`
-      : `Invoice for ${shown}: ${invoice.url}`,
+    line: `The invoice for ${shown} is on its way to ${closing.to}.`,
   };
 };

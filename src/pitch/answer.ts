@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { checkPitch, type PitchProblem } from "./check";
 import { pitchTone, priceNote } from "./prompt";
-import type { PitchChannel, Sender } from "./write";
+import type { Sender } from "./write";
 import type { Verdict } from "./read-reply";
 
 /**
@@ -99,19 +99,16 @@ export const writeAnswer = async ({
   business,
   siteUrl,
   sender,
-  channel,
 }: {
   verdict: Verdict;
   thread: { side: "us" | "them"; text: string }[];
   business: string;
   siteUrl: string;
   sender: Sender;
-  channel: PitchChannel;
 }): Promise<Answered | null> => {
   if (!canAnswer(verdict)) return null;
 
   const price = priceNote(sender.priceBand);
-  const texting = channel === "sms";
 
   const conversation = thread
     .slice(-6)
@@ -131,9 +128,7 @@ export const writeAnswer = async ({
     "",
     `What to do: ${BRIEF[verdict]}`,
     "",
-    texting
-      ? "This is a text message. Under 300 characters. No sign-off — one is added for you."
-      : "This is an email reply. Three sentences or fewer. No sign-off — one is added for you.",
+    "This is an email reply. Three sentences or fewer. No sign-off — one is added for you.",
     "",
     'Return JSON and nothing else: {"body": "the reply"}',
   ].join("\n");
@@ -148,9 +143,7 @@ export const writeAnswer = async ({
     temperature: 0.5,
   });
 
-  const body = texting
-    ? `${value.body.trim()}\n— ${sender.tradingName}`
-    : `${value.body.trim()}\n\n—\n${sender.tradingName}`;
+  const body = [value.body.trim(), "—", sender.tradingName].join("\n\n");
 
   const problems = checkPitch({
     subject: "",
@@ -158,7 +151,6 @@ export const writeAnswer = async ({
     business,
     siteUrl,
     pricing: Boolean(price),
-    channel,
     // A reply is not required to carry the link. It already went out in the
     // first message, and repeating it in every answer is what a mailshot does.
     reply: true,

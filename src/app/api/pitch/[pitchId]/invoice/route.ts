@@ -64,8 +64,7 @@ export async function POST(
       business: pitch.business,
       siteUrl: pitch.siteUrl,
       amount,
-      email: pitch.channel === "email" ? pitch.to : undefined,
-      phone: pitch.channel === "sms" ? pitch.to : undefined,
+      email: pitch.to,
       tradingName: pitch.tradingName,
     });
 
@@ -85,15 +84,14 @@ export async function POST(
       return Response.json({ error: "That one already has an invoice." }, { status: 409 });
     }
 
-    // Stripe emails it where there is an address. A business reached by text
-    // gets the link from the screen, because Stripe cannot email a phone.
-    if (pitch.channel === "email") await emailInvoice(invoice.id).catch(() => {});
+    // Stripe delivers it. The link comes back either way, for the screen.
+    await emailInvoice(invoice.id).catch(() => {});
 
     return Response.json({
       url: invoice.url,
       amount: invoice.amount,
       shown: money(invoice.amount, invoice.currency),
-      emailed: pitch.channel === "email",
+      emailed: true,
     });
   } catch (cause) {
     return Response.json(

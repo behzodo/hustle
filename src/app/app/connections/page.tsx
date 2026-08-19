@@ -19,10 +19,6 @@ const Page = async () => {
     <WorkspaceShell page="Connections">
       <ConnectionsView
         gmailConnected={Boolean(profile?.gmailConnectionId)}
-        textingConnected={Boolean(profile?.twilioConnectionId)}
-        textingNumber={profile?.twilioNumber}
-        instagramConnected={Boolean(profile?.instagramConnectionId)}
-        facebookConnected={Boolean(profile?.facebookConnectionId)}
         stripeStatus={stripeStatus}
       />
     </WorkspaceShell>

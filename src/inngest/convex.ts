@@ -166,7 +166,6 @@ export interface PitchContext {
   categories: string[];
   town?: string;
   website?: string;
-  phone?: string;
   presence: string;
   siteUrl: string;
   projectId: string;
@@ -180,8 +179,6 @@ export interface PitchContext {
     priceBand?: string;
     gmailConnectionId?: string;
     gmailEmail?: string;
-    twilioConnectionId?: string;
-    twilioNumber?: string;
   };
   pitched: boolean;
 }
@@ -207,7 +204,6 @@ export const saveLeadPitch = (body: {
   to: string;
   subject: string;
   body: string;
-  channel: "email" | "sms" | "instagram" | "facebook";
   blocked: boolean;
   write: {
     provider: string;
@@ -236,7 +232,6 @@ export const takeNextPitch = (projectId: string) =>
       to: string;
       subject: string;
       body: string;
-      channel: "email" | "sms" | "instagram" | "facebook";
       connectionId: string;
       from: string;
     } | null;
@@ -245,7 +240,6 @@ export const takeNextPitch = (projectId: string) =>
 export const recordPitchSent = (body: {
   pitchId: string;
   gmail?: { threadId: string; messageId: string; rfcId?: string };
-  sms?: { messageSid: string; from: string };
   error?: string;
 }) => call<{ ok: boolean }>("/pitch/sent", body);
 
@@ -285,33 +279,6 @@ export const fetchPitchTargets = (projectId: string, limit?: number) =>
     "/pitch/targets",
     { projectId, limit },
   );
-
-/**
- * Which conversation an inbound text belongs to.
- *
- * A text carries the number it came from and the number it was sent to, and
- * nothing else. The second says whose account it is; the first says which
- * business. There is no thread id to correlate on.
- */
-export const findInboundPitch = (body: { from: string; to: string }) =>
-  call<{
-    found: {
-      pitchId?: string;
-      userId: string;
-      connectionId: string;
-      business?: string;
-      siteUrl?: string;
-      thread: { side: "us" | "them"; text: string; at: number }[];
-      invoiced: boolean;
-      sender: {
-        tradingName: string;
-        city?: string;
-        tone?: string;
-        priceBand?: string;
-        stripeAccountId?: string;
-      };
-    } | null;
-  }>("/pitch/inbound", body);
 
 /** Adds one message to a thread, whichever side wrote it. */
 export const appendPitchMessage = (body: {

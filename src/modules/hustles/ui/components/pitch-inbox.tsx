@@ -5,11 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
   ArrowSquareOutIcon,
-  ChatCircleDotsIcon,
   CheckCircleIcon,
-  EnvelopeSimpleIcon,
-  FacebookLogoIcon,
-  InstagramLogoIcon,
   MagnifyingGlassIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
@@ -73,24 +69,6 @@ const LOOKS: Record<string, { label: string; dot: string }> = {
 };
 
 const look = (status: string) => LOOKS[status] ?? LOOKS.sent;
-
-/**
- * Which way this one went.
- *
- * Worth a glyph on every row rather than a column, because the channel
- * explains the message: a hundred and ten words with a sign-off is an email,
- * two sentences is a text, and a reader who cannot tell them apart will judge
- * the text for being short.
- */
-const CHANNELS = {
-  email: { Icon: EnvelopeSimpleIcon, label: "Email" },
-  sms: { Icon: ChatCircleDotsIcon, label: "Text" },
-  instagram: { Icon: InstagramLogoIcon, label: "Instagram" },
-  facebook: { Icon: FacebookLogoIcon, label: "Facebook" },
-} as const;
-
-const channelOf = (channel: string) =>
-  CHANNELS[channel as keyof typeof CHANNELS] ?? CHANNELS.email;
 
 const when = (at: number) =>
   formatDistanceToNow(new Date(at), { addSuffix: true }).replace("about ", "");
@@ -181,19 +159,6 @@ const Gauge = ({
  * The list.
  * -------------------------------------------------------------------------- */
 
-/** The channel glyph. Muted — it labels the row, it does not compete with it. */
-const Channel = ({ channel }: { channel: string }) => {
-  const { Icon, label } = channelOf(channel);
-
-  return (
-    <Icon
-      className="text-muted-foreground/50 size-3 shrink-0"
-      weight="fill"
-      aria-label={label}
-    />
-  );
-};
-
 const Row = ({
   pitch,
   active,
@@ -220,7 +185,6 @@ const Row = ({
     >
       <div className="flex w-full items-center gap-2">
         <span className={cn("size-1 shrink-0 rounded-full", style.dot)} />
-        <Channel channel={pitch.channel} />
         <span
           className={cn(
             "min-w-0 flex-1 truncate tracking-[-0.01em]",
@@ -440,13 +404,10 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
             <Stamp status={pitch.status} />
           </div>
 
-          <p className="text-muted-foreground/70 mt-1.5 flex items-center gap-1.5 text-xs">
-            <Channel channel={pitch.channel} />
-            {channelOf(pitch.channel).label} · {pitch.trade}
-          </p>
+          <p className="text-muted-foreground/70 mt-1.5 text-xs">{pitch.trade}</p>
 
           <div className="mt-4 space-y-1.5">
-            <Field label={pitch.channel === "sms" ? "Number" : "To"} value={pitch.to} />
+            <Field label="To" value={pitch.to} />
             <Field label="Site" value={pitch.siteUrl.replace("https://", "")} />
             {pitch.sentAt && <Field label="Sent" value={when(pitch.sentAt)} />}
           </div>

@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { Nango } from "@nangohq/node";
 
-import {
-  INTEGRATIONS,
-  isIntegrationKey,
-  NANGO_SECRET_KEY,
-} from "@/lib/nango";
+import { GMAIL_INTEGRATION_ID, NANGO_SECRET_KEY } from "@/lib/nango";
 
 /**
  * Mints a short-lived Nango Connect session for the signed-in user.
@@ -15,7 +11,7 @@ import {
  * here and only the token goes back. The token is scoped to one integration
  * and one end user, so it cannot be used to connect anything else.
  */
-export const POST = async (request: Request) => {
+export const POST = async () => {
   const { userId } = await auth();
 
   if (!userId) {
@@ -27,16 +23,6 @@ export const POST = async (request: Request) => {
       { error: "Nango is not configured on this environment" },
       { status: 503 }
     );
-  }
-
-  // Which account is being connected. Checked against the map rather than
-  // passed through, so a token minted here can only ever open one of the four
-  // integrations this app knows about.
-  const body = await request.json().catch(() => ({}));
-  const key = String(body?.integration ?? "gmail");
-
-  if (!isIntegrationKey(key)) {
-    return NextResponse.json({ error: "Unknown integration" }, { status: 400 });
   }
 
   const user = await currentUser();
@@ -51,7 +37,7 @@ export const POST = async (request: Request) => {
         email: user?.primaryEmailAddress?.emailAddress,
         display_name: user?.fullName ?? undefined,
       },
-      allowed_integrations: [INTEGRATIONS[key]],
+      allowed_integrations: [GMAIL_INTEGRATION_ID],
     });
 
     return NextResponse.json({ sessionToken: res.data.token });
@@ -59,7 +45,7 @@ export const POST = async (request: Request) => {
     console.error("Nango session failed", error);
 
     return NextResponse.json(
-      { error: "Could not start that connection" },
+      { error: "Could not start the Google connection" },
       { status: 502 }
     );
   }
