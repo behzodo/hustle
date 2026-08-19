@@ -211,4 +211,156 @@ http.route({
   }),
 });
 
+/* -------------------------------------------------------------------------- *
+ * The pitch lane.
+ *
+ * Six routes rather than three, because sending has a step the build lane does
+ * not: the address has to be found before anything can be written, and finding
+ * it means fetching somebody else's web page — which Convex is the wrong place
+ * to do from, and which fails often enough that it needs its own record.
+ * -------------------------------------------------------------------------- */
+
+http.route({
+  path: "/pitch/context",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const lead = await ctx.runQuery(internal.pitches.context, { leadId: body.leadId });
+
+    return Response.json({ lead });
+  }),
+});
+
+http.route({
+  path: "/pitch/targets",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const leads = await ctx.runQuery(internal.pitches.toDraft, {
+      projectId: body.projectId,
+      limit: body.limit,
+    });
+
+    return Response.json({ leads });
+  }),
+});
+
+http.route({
+  path: "/pitch/email",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    await ctx.runMutation(internal.pitches.recordEmail, {
+      leadId: body.leadId,
+      email: body.email,
+      source: body.source,
+    });
+
+    return Response.json({ ok: true });
+  }),
+});
+
+http.route({
+  path: "/pitch/draft",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const pitchId = await ctx.runMutation(internal.pitches.saveDraft, body);
+
+    return Response.json({ pitchId });
+  }),
+});
+
+http.route({
+  path: "/pitch/queue",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const result = await ctx.runMutation(internal.pitches.queueProject, {
+      projectId: body.projectId,
+    });
+
+    return Response.json(result);
+  }),
+});
+
+http.route({
+  path: "/pitch/next",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const next = await ctx.runMutation(internal.pitches.takeNext, {
+      projectId: body.projectId,
+    });
+
+    return Response.json({ next });
+  }),
+});
+
+http.route({
+  path: "/pitch/sent",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    await ctx.runMutation(internal.pitches.recordSent, {
+      pitchId: body.pitchId,
+      gmail: body.gmail,
+      error: body.error,
+    });
+
+    return Response.json({ ok: true });
+  }),
+});
+
+/** Everything still waiting on an answer, and what came back. */
+http.route({
+  path: "/pitch/open",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const open = await ctx.runQuery(internal.pitches.awaitingReply, {
+      projectId: body.projectId,
+    });
+
+    return Response.json({ open });
+  }),
+});
+
+http.route({
+  path: "/pitch/reply",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    await ctx.runMutation(internal.pitches.recordReply, {
+      pitchId: body.pitchId,
+      messages: body.messages,
+      verdict: body.verdict,
+      gist: body.gist,
+    });
+
+    return Response.json({ ok: true });
+  }),
+});
+
 export default http;

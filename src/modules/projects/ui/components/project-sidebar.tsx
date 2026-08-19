@@ -8,6 +8,7 @@ import {
   FolderSimpleIcon,
   HammerIcon,
   LifebuoyIcon,
+  PaperPlaneTiltIcon,
   PlugIcon,
   SquaresFourIcon,
 } from "@phosphor-icons/react";
@@ -216,6 +217,9 @@ const UserRow = () => {
  */
 export const filedHref = (projectId: ProjectId) => `/hustles/${projectId}`;
 
+/** Where this hustle's outreach lives — the inbox the built sites are sent from. */
+export const pitchHref = (projectId: ProjectId) => `/hustles/${projectId}/pitch`;
+
 export const ProjectSidebar = ({
   projectId,
   fileRef,
@@ -270,6 +274,10 @@ export const ProjectSidebar = ({
     // climbs while the sweep is still running — a drawer filling up is worth
     // seeing from anywhere on the screen.
     row("Building", filedHref(projectId), FolderSimpleIcon, hunt?.found),
+    // The other end of the same hustle. Building makes the websites; this is
+    // where they are sent to the people they were made for, which is the only
+    // step that has ever produced any money.
+    row("Pitching", pitchHref(projectId), PaperPlaneTiltIcon),
   ];
 
   const platform = [

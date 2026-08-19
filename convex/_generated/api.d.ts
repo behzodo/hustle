@@ -20,6 +20,7 @@ import type * as lib_places_scrapedo from "../lib/places/scrapedo.js";
 import type * as lib_places_serper from "../lib/places/serper.js";
 import type * as lib_places_types from "../lib/places/types.js";
 import type * as messages from "../messages.js";
+import type * as pitches from "../pitches.js";
 import type * as profiles from "../profiles.js";
 import type * as projects from "../projects.js";
 import type * as sites from "../sites.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "lib/places/serper": typeof lib_places_serper;
   "lib/places/types": typeof lib_places_types;
   messages: typeof messages;
+  pitches: typeof pitches;
   profiles: typeof profiles;
   projects: typeof projects;
   sites: typeof sites;

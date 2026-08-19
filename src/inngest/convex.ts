@@ -154,3 +154,112 @@ export const takeNextSite = (projectId: string) =>
     "/site/next",
     { projectId },
   );
+
+/* ---------------------------------------------------------------------------
+ * The pitch lane. One lead, one email, one thread.
+ * ------------------------------------------------------------------------- */
+
+/** The business, the site built for it, and whoever is signing the email. */
+export interface PitchContext {
+  name: string;
+  trade: string;
+  categories: string[];
+  town?: string;
+  website?: string;
+  presence: string;
+  siteUrl: string;
+  projectId: string;
+  userId: string;
+  email?: string;
+  emailCheckedAt?: number;
+  sender: {
+    tradingName: string;
+    city?: string;
+    tone?: string;
+    priceBand?: string;
+    gmailConnectionId?: string;
+    gmailEmail?: string;
+  };
+  pitched: boolean;
+}
+
+export const fetchPitchContext = (leadId: string) =>
+  call<{ lead: PitchContext | null }>("/pitch/context", { leadId });
+
+/**
+ * Records the email hunt, including when it found nothing.
+ *
+ * The absence is the point: a business with no published address is the common
+ * case, and a run that does not write down having looked will look again every
+ * time, at a few hundred fetches a go.
+ */
+export const recordLeadEmail = (body: {
+  leadId: string;
+  email?: string;
+  source?: string;
+}) => call<{ ok: boolean }>("/pitch/email", body);
+
+export const saveLeadPitch = (body: {
+  leadId: string;
+  to: string;
+  subject: string;
+  body: string;
+  blocked: boolean;
+  write: {
+    provider: string;
+    tokens: number;
+    seconds: number;
+    rewrites: number;
+    problems: string[];
+  };
+}) => call<{ pitchId: string | null }>("/pitch/draft", body);
+
+/** Marks a hustle's drafts as ready to send. Never touches anything sent. */
+export const queueProjectPitches = (projectId: string) =>
+  call<{ queued: number }>("/pitch/queue", { projectId });
+
+/**
+ * Takes the next pitch off the send queue, claiming it as it reads.
+ *
+ * Returns the Gmail connection alongside the email, because the alternative is
+ * a second round trip per send for a value that cannot change between the two.
+ */
+export const takeNextPitch = (projectId: string) =>
+  call<{
+    next: {
+      pitchId: string;
+      business: string;
+      to: string;
+      subject: string;
+      body: string;
+      connectionId: string;
+      from: string;
+    } | null;
+  }>("/pitch/next", { projectId });
+
+export const recordPitchSent = (body: {
+  pitchId: string;
+  gmail?: { threadId: string; messageId: string; rfcId?: string };
+  error?: string;
+}) => call<{ ok: boolean }>("/pitch/sent", body);
+
+/** Every pitch still waiting on an answer. */
+export const fetchOpenPitches = (projectId: string) =>
+  call<{ open: { pitchId: string; threadId: string; known: number }[] }>(
+    "/pitch/open",
+    { projectId },
+  );
+
+export const recordPitchReply = (body: {
+  pitchId: string;
+  messages: { side: "us" | "them"; text: string; at: number }[];
+  verdict?: string;
+  gist?: string;
+}) => call<{ ok: boolean }>("/pitch/reply", body);
+
+/** Businesses with a finished site and nothing written to them yet. */
+export const fetchPitchTargets = (projectId: string, limit?: number) =>
+  call<{ leads: { leadId: string; name: string; score: number }[] }>(
+    "/pitch/targets",
+    { projectId, limit },
+  );

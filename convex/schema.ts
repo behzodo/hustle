@@ -45,6 +45,26 @@ export const huntQueryValidator = v.object({
   zoom: v.number(),
 });
 
+// Where a pitch has got to.
+//
+// "sending" is a claim rather than a fact, the same as a lead's "building":
+// a worker that dies between claiming the row and Gmail answering leaves it
+// set forever, so it carries a `startedAt` for the same staleness check.
+//
+// "won" and "lost" are set by hand or by reading a reply. Neither is final in
+// any technical sense — a business that said no is still a business with no
+// website — but the inbox has to stop showing something at some point.
+export const pitchStatus = v.union(
+  v.literal("drafted"),
+  v.literal("queued"),
+  v.literal("sending"),
+  v.literal("sent"),
+  v.literal("replied"),
+  v.literal("won"),
+  v.literal("lost"),
+  v.literal("failed"),
+);
+
 // What a business is using instead of a website. `site` means they have their
 // own domain and are not a prospect; see src/modules/hustles/discovery/lead.ts
 // for why a Facebook page counts as a gap rather than a website.
@@ -276,6 +296,27 @@ export default defineSchema({
     // never clears it, and without a time to compare against, the business it
     // was working on stays claimed by nobody forever. See STALE_BUILD_MS.
     siteStartedAt: v.optional(v.number()),
+    // Where to send the pitch.
+    //
+    // Not on the listing. Google Maps gives a phone number and never an email,
+    // which is the one fact that decides the shape of this whole lane: the
+    // business has to be found a second time, on whatever page they do have,
+    // or the address has to be typed in by hand.
+    //
+    // `checkedAt` is what stops that search repeating. A business with no
+    // email anywhere is the common case, and without a record of having
+    // looked, every run would look again — a few hundred fetches to learn
+    // the same nothing.
+    contact: v.optional(
+      v.object({
+        email: v.optional(v.string()),
+        // "social", "website", "manual". Kept because a hand-typed address is
+        // worth more trust than one regexed off a Linktree, and because an
+        // address that bounces should be explainable.
+        source: v.optional(v.string()),
+        checkedAt: v.optional(v.number()),
+      }),
+    ),
   })
     .index("by_project", ["projectId"])
     // Shares one namespace with projects.site.slug — both publish under the
@@ -294,6 +335,98 @@ export default defineSchema({
     // others in the same patch — and an index nobody queries is still written
     // on every insert.
     .index("by_project_target_and_score", ["projectId", "target", "score"]),
+
+  // One approach to one business: the email, the thread it started, and how
+  // it went.
+  //
+  // Its own table rather than another optional object on the lead, because a
+  // pitch has a beginning and an end and there can be a second one. A shop
+  // that said no in March is still a shop with no website, and is worth asking
+  // again once the site has been rebuilt — which is a new pitch, not an edit
+  // of the old one. The lead is the business; this is the attempt.
+  pitches: defineTable({
+    projectId: v.id("projects"),
+    leadId: v.id("leads"),
+    userId: v.string(),
+
+    // Copied off the lead rather than looked up.
+    //
+    // The inbox draws a hundred rows and every one of them shows the business
+    // name and what they do. Reading the lead for each would be a hundred
+    // extra document reads to draw one screen, and none of these three change
+    // after the pitch is written.
+    business: v.string(),
+    trade: v.string(),
+    // The site being pitched, as it was when the email went out. Stored rather
+    // than read off the lead because this is the link that was actually sent.
+    siteUrl: v.string(),
+
+    to: v.string(),
+    subject: v.string(),
+    body: v.string(),
+    status: pitchStatus,
+
+    // Gmail's own ids, once it has accepted the message.
+    //
+    // The thread id is the only way a reply arriving days later can be matched
+    // back to what it is replying to, and the message id is what a follow-up
+    // is threaded onto so it lands in the same conversation rather than as a
+    // second cold email.
+    gmail: v.optional(
+      v.object({
+        threadId: v.string(),
+        messageId: v.string(),
+        // RFC 2822 Message-ID, which is what In-Reply-To has to carry. Gmail's
+        // own id is not the same thing and will not thread.
+        rfcId: v.optional(v.string()),
+      }),
+    ),
+
+    // The conversation, oldest first — ours and theirs in one list, because
+    // the screen reads it top to bottom and a split would have to be merged
+    // to show it.
+    thread: v.array(
+      v.object({
+        side: v.union(v.literal("us"), v.literal("them")),
+        text: v.string(),
+        at: v.number(),
+      }),
+    ),
+
+    // What the writer spent, and what the checker caught before it went out.
+    // Same reason as leads.site.build: the email is not the whole story and
+    // a check that fired leaves no other trace.
+    write: v.optional(
+      v.object({
+        provider: v.string(),
+        tokens: v.number(),
+        seconds: v.number(),
+        rewrites: v.number(),
+        problems: v.array(v.string()),
+      }),
+    ),
+
+    sentAt: v.optional(v.number()),
+    // Set while `status` is "sending"; see pitchStatus.
+    startedAt: v.optional(v.number()),
+    // Why it failed. A pitch that failed silently looks like one nobody sent.
+    error: v.optional(v.string()),
+    // Absent means unread. The inbox filters on it, which is the only reason
+    // it exists — nothing else cares.
+    readAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_lead", ["leadId"])
+    // The inbox: one hustle's pitches, most recent first.
+    .index("by_project_and_updated", ["projectId", "updatedAt"])
+    // The queue: everything waiting to go out, oldest first so the one that
+    // has been waiting longest is sent first.
+    .index("by_project_status_and_updated", ["projectId", "status", "updatedAt"])
+    // Every pitch this user has, across hustles. Unlike leads, this one is
+    // worth having: an inbox is a place, not a property of a patch.
+    .index("by_user_and_updated", ["userId", "updatedAt"])
+    // Matching an incoming reply to the pitch it answers.
+    .index("by_thread", ["gmail.threadId"]),
 
   fragments: defineTable({
     messageId: v.id("messages"),
