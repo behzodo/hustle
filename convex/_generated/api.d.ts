@@ -9,6 +9,7 @@
  */
 
 import type * as credits from "../credits.js";
+import type * as crons from "../crons.js";
 import type * as discovery from "../discovery.js";
 import type * as feedback from "../feedback.js";
 import type * as http from "../http.js";
@@ -33,6 +34,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   credits: typeof credits;
+  crons: typeof crons;
   discovery: typeof discovery;
   feedback: typeof feedback;
   http: typeof http;

@@ -17,6 +17,13 @@ import "server-only";
  * reachable by hand or by phone. That is a fact about the data, not a gap in
  * the code, and the screen has to show it rather than hide it.
  *
+ * Both are now less true than they were. Texting reaches every business on a
+ * listing, because a phone number is the one thing a listing always has — so
+ * the finder's failure rate stopped being the ceiling on the whole lane and
+ * became the reason there is a second channel. Instagram and Facebook are
+ * connected too, but only ever receive: Meta refuses a message to anybody who
+ * has not written in first.
+ *
  * The second is legal, and it is not finished. A cold commercial email needs a
  * working opt-out — that is in `write.ts`, in the sign-off, and it is a real
  * one — but CAN-SPAM in the United States also requires a valid physical
@@ -30,4 +37,14 @@ export { findEmail, emailFromHtml, type FoundEmail } from "./find-email";
 export { writePitch, type ComposedPitch, type PitchFacts, type Sender } from "./write";
 export { checkPitch, type PitchProblem, type PitchSeverity } from "./check";
 export { sendMail, readThread, stripQuoted, type Incoming, type Sent } from "./gmail";
-export { readReply, type Reading } from "./read-reply";
+export { readReply, type Reading, type Verdict } from "./read-reply";
+export { writeAnswer, canAnswer, type Answered } from "./answer";
+export { routeFor, whyUnreachable, type Route } from "./channels";
+export {
+  sendText,
+  listNumbers,
+  searchNumbers,
+  buyNumber,
+  toE164,
+  signatureValid,
+} from "./twilio";

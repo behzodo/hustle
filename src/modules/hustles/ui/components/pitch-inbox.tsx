@@ -5,8 +5,11 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
   ArrowSquareOutIcon,
+  ChatCircleDotsIcon,
   CheckCircleIcon,
   EnvelopeSimpleIcon,
+  FacebookLogoIcon,
+  InstagramLogoIcon,
   MagnifyingGlassIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
@@ -14,7 +17,6 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +24,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { ProjectId } from "@/modules/projects/types";
-import { NoAddressList } from "./no-address-list";
 import {
   useEditPitch,
   useMarkPitchRead,
@@ -31,74 +32,64 @@ import {
   useSetPitchStatus,
 } from "@/modules/hustles/use-pitches";
 
+import { NoAddressList } from "./no-address-list";
+
 /**
  * The inbox.
  *
- * Built to the shape of shadcn's sidebar-09 — a narrow rail, a column of
- * messages beside it, a reading pane taking the rest — because that shape is
- * what every person alive already knows how to use, and this screen is asking
- * them to read a few hundred emails they did not write.
+ * Bones from shadcn's sidebar-09 — rail, message column, reading pane —
+ * because that shape is what everybody already knows how to use, and this
+ * screen asks somebody to read hundreds of emails they did not write.
  *
- * Two things are deliberately different from a mail client.
+ * Dressed in the same milled metal as the rest of the product, and dressed
+ * deliberately rather than decoratively: this is the panel where a machine
+ * that built seventy-three websites hands over to a person who has to decide
+ * which of them to send. So it is built like an instrument. Engraved labels,
+ * hairline rules, one gauge, and exactly one plate of chrome — on Send, which
+ * is the only control here that cannot be undone.
  *
- * The reading pane shows the website next to the email. The pitch is a link
- * and a sentence about a page; judging whether it is any good means looking at
- * the page, and a screen that makes somebody open a tab to do that is a screen
- * where nobody checks.
- *
- * And nothing here sends by itself. Drafting writes; sending is a separate
- * button with its own confirmation, because the row under the cursor is a real
- * business with a real person reading it, and there is no unsend.
+ * Colour is spent nowhere. The app is chroma 0 throughout and a status pill in
+ * amber would be the loudest thing on the screen while saying the least; state
+ * is carried by an engraved capsule and a 4px dot instead. Two things are
+ * different from a mail client: the reading pane shows the website beside the
+ * email, because judging a pitch means looking at the page it links to; and
+ * nothing sends by itself.
  */
 
-/** How a pitch looks, by where it has got to. */
-const LOOKS: Record<
-  string,
-  { label: string; dot: string; chip: string }
-> = {
-  drafted: {
-    label: "Draft",
-    dot: "bg-amber-500",
-    chip: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  },
-  queued: {
-    label: "Queued",
-    dot: "bg-sky-500",
-    chip: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  },
-  sending: {
-    label: "Sending",
-    dot: "bg-sky-500 animate-pulse",
-    chip: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  },
-  sent: {
-    label: "Sent",
-    dot: "bg-muted-foreground/50",
-    chip: "border-border bg-muted/60 text-muted-foreground",
-  },
-  replied: {
-    label: "Replied",
-    dot: "bg-emerald-500",
-    chip: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  },
-  won: {
-    label: "Won",
-    dot: "bg-emerald-600",
-    chip: "border-emerald-600/40 bg-emerald-600/15 text-emerald-700 dark:text-emerald-300",
-  },
-  lost: {
-    label: "Lost",
-    dot: "bg-muted-foreground/30",
-    chip: "border-border bg-muted/40 text-muted-foreground",
-  },
-  failed: {
-    label: "Blocked",
-    dot: "bg-red-500",
-    chip: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
-  },
+/** How a pitch reads, by where it has got to. */
+const LOOKS: Record<string, { label: string; dot: string }> = {
+  drafted: { label: "Draft", dot: "bg-foreground/45" },
+  queued: { label: "Queued", dot: "bg-foreground/70" },
+  sending: { label: "Sending", dot: "bg-foreground/70 animate-pulse" },
+  sent: { label: "Sent", dot: "bg-foreground" },
+  // The two that mean a person wrote back get the one ring of emphasis on the
+  // screen, because on a list of four hundred that is the only event worth
+  // finding at a glance.
+  replied: { label: "Replied", dot: "bg-foreground ring-foreground/25 ring-3" },
+  won: { label: "Won", dot: "bg-foreground ring-foreground/40 ring-3" },
+  lost: { label: "Lost", dot: "bg-foreground/20" },
+  failed: { label: "Blocked", dot: "bg-foreground/25 ring-foreground/20 ring-2" },
 };
 
 const look = (status: string) => LOOKS[status] ?? LOOKS.sent;
+
+/**
+ * Which way this one went.
+ *
+ * Worth a glyph on every row rather than a column, because the channel
+ * explains the message: a hundred and ten words with a sign-off is an email,
+ * two sentences is a text, and a reader who cannot tell them apart will judge
+ * the text for being short.
+ */
+const CHANNELS = {
+  email: { Icon: EnvelopeSimpleIcon, label: "Email" },
+  sms: { Icon: ChatCircleDotsIcon, label: "Text" },
+  instagram: { Icon: InstagramLogoIcon, label: "Instagram" },
+  facebook: { Icon: FacebookLogoIcon, label: "Facebook" },
+} as const;
+
+const channelOf = (channel: string) =>
+  CHANNELS[channel as keyof typeof CHANNELS] ?? CHANNELS.email;
 
 const when = (at: number) =>
   formatDistanceToNow(new Date(at), { addSuffix: true }).replace("about ", "");
@@ -114,9 +105,93 @@ const teaser = (body: string) =>
 
 type Pitch = NonNullable<ReturnType<typeof usePitches>>[number];
 
+/** An etched capsule. Says the state without shouting a colour at it. */
+const Stamp = ({ status }: { status: string }) => {
+  const style = look(status);
+
+  return (
+    <span className="border-border/70 bg-muted/40 inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-[3px]">
+      <span className={cn("size-1 rounded-full", style.dot)} />
+      <span className="engraved text-muted-foreground text-[9px] leading-none tracking-[0.18em] uppercase">
+        {style.label}
+      </span>
+    </span>
+  );
+};
+
+/* -------------------------------------------------------------------------- *
+ * The gauge.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every site this hustle built, and what happened to it.
+ *
+ * The signature of the screen, and the only place its hardest fact is stated
+ * plainly: on a real patch most of the bar cannot be filled. Sixty-one of
+ * seventy-three Jacksonville businesses had no web page at all, so there was
+ * nowhere to find an email — and that segment is machined rather than left
+ * empty, because an empty channel reads as work outstanding and this is a
+ * stop.
+ *
+ * Four numbers in a row would carry the same data and none of the meaning.
+ */
+const Gauge = ({
+  progress,
+}: {
+  progress: NonNullable<ReturnType<typeof usePitchProgress>>;
+}) => {
+  const total = Math.max(progress.live, 1);
+  const inPlay = progress.drafted + progress.queued + progress.sent + progress.replied;
+  const pct = (n: number) => `${Math.round((n / total) * 1000) / 10}%`;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between">
+        <span className="engraved text-muted-foreground/70 text-[9px] tracking-[0.28em] uppercase">
+          This patch
+        </span>
+        <span className="text-muted-foreground/60 font-mono text-[10px] tabular-nums">
+          {progress.live} sites
+        </span>
+      </div>
+
+      <div
+        className="gauge relative flex h-[7px] w-full overflow-hidden"
+        role="img"
+        aria-label={`${inPlay} of ${progress.live} sites have a pitch, ${progress.unreachable} have no address`}
+      >
+        <span className="gauge-fill h-full" style={{ width: pct(inPlay) }} />
+        {/* Butted straight against the fill, no gap: it is the same channel,
+            and a gap would read as a third state. */}
+        <span className="gauge-knurl h-full" style={{ width: pct(progress.unreachable) }} />
+      </div>
+
+      <p className="text-muted-foreground/70 font-mono text-[10px] tabular-nums">
+        {progress.drafted} written · {progress.sent} sent · {progress.replied} replied
+        {progress.unreachable > 0 && (
+          <> · <span className="text-muted-foreground">{progress.unreachable} no address</span></>
+        )}
+      </p>
+    </div>
+  );
+};
+
 /* -------------------------------------------------------------------------- *
  * The list.
  * -------------------------------------------------------------------------- */
+
+/** The channel glyph. Muted — it labels the row, it does not compete with it. */
+const Channel = ({ channel }: { channel: string }) => {
+  const { Icon, label } = channelOf(channel);
+
+  return (
+    <Icon
+      className="text-muted-foreground/50 size-3 shrink-0"
+      weight="fill"
+      aria-label={label}
+    />
+  );
+};
 
 const Row = ({
   pitch,
@@ -129,42 +204,57 @@ const Row = ({
 }) => {
   const style = look(pitch.status);
   const unread = !pitch.readAt;
+  const answer = pitch.thread.at(-1)?.side === "them" ? pitch.thread.at(-1) : null;
 
   return (
     <button
       type="button"
       onClick={onPick}
       className={cn(
-        "border-border/60 hover:bg-muted/50 flex w-full flex-col items-start gap-1.5 border-b p-4 text-left text-sm leading-tight transition-colors last:border-b-0",
-        active && "bg-muted/70",
+        "border-border/50 hover:bg-muted/40 relative flex w-full flex-col items-start gap-1.5 border-b py-3.5 pr-4 pl-4 text-left text-sm leading-tight transition-colors last:border-b-0",
+        // The lit rail rather than a fill: the list is monochrome and dense,
+        // so which row you are reading has to be a change of material.
+        active && "milled bg-muted/50 rail-lit",
       )}
     >
       <div className="flex w-full items-center gap-2">
-        <span className={cn("size-1.5 shrink-0 rounded-full", style.dot)} />
+        <span className={cn("size-1 shrink-0 rounded-full", style.dot)} />
+        <Channel channel={pitch.channel} />
         <span
           className={cn(
-            "min-w-0 flex-1 truncate",
+            "min-w-0 flex-1 truncate tracking-[-0.01em]",
             unread ? "text-foreground font-medium" : "text-muted-foreground",
           )}
         >
           {pitch.business}
         </span>
-        <span className="text-muted-foreground/70 shrink-0 font-mono text-[10px] tabular-nums">
+        <span className="text-muted-foreground/50 shrink-0 font-mono text-[10px] tabular-nums">
           {when(pitch.updatedAt)}
         </span>
       </div>
 
-      <span className={cn("w-full truncate", unread ? "font-medium" : "")}>
+      <span
+        className={cn(
+          "w-full truncate text-[13px]",
+          unread ? "text-foreground/90 font-medium" : "text-muted-foreground/80",
+        )}
+      >
         {pitch.subject}
       </span>
 
-      <span className="text-muted-foreground line-clamp-2 w-full text-xs">
-        {/* The reply, once there is one — it is the thing that changed, and a
-            row still teasing our own email hides the only new information on
-            the screen. */}
-        {pitch.thread.at(-1)?.side === "them"
-          ? pitch.thread.at(-1)!.text.slice(0, 160)
-          : teaser(pitch.body)}
+      <span className="text-muted-foreground/60 line-clamp-2 w-full text-xs">
+        {/* Their reply once there is one — it is what changed, and a row still
+            teasing our own email hides the only new thing on the screen. */}
+        {answer ? (
+          <>
+            <span className="engraved text-muted-foreground mr-1.5 text-[9px] tracking-[0.18em] uppercase">
+              Reply
+            </span>
+            {answer.text.slice(0, 150)}
+          </>
+        ) : (
+          teaser(pitch.body)
+        )}
       </span>
     </button>
   );
@@ -175,9 +265,13 @@ const Row = ({
  * -------------------------------------------------------------------------- */
 
 const Field = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-baseline gap-2 text-xs">
-    <span className="text-muted-foreground/70 w-12 shrink-0">{label}</span>
-    <span className="text-foreground/90 min-w-0 truncate font-mono">{value}</span>
+  <div className="flex items-baseline gap-3 text-xs">
+    <span className="engraved text-muted-foreground/60 w-9 shrink-0 text-[9px] tracking-[0.2em] uppercase">
+      {label}
+    </span>
+    <span className="text-foreground/80 min-w-0 truncate font-mono text-[11px]">
+      {value}
+    </span>
   </div>
 );
 
@@ -188,7 +282,6 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
   const [draft, setDraft] = useState({ subject: pitch.subject, body: pitch.body });
   const [saving, setSaving] = useState(false);
 
-  const style = look(pitch.status);
   const editable = pitch.status === "drafted" || pitch.status === "failed";
   const reply = pitch.thread.filter((m) => m.side === "them").at(-1);
 
@@ -213,80 +306,94 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* ---- who, and where it stands ---- */}
-      <header className="border-border/60 flex flex-wrap items-start justify-between gap-3 border-b p-5">
+      <header className="border-border/60 milled flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="font-display headline-display truncate text-lg tracking-[-0.02em]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* The one piece of display type on the screen, and the one thing
+                cut from chrome. It is the name of a real shop in a real town,
+                which is the whole reason any of this exists. */}
+            <h2 className="metal-text font-display headline-display max-w-full truncate text-[26px] leading-none tracking-[-0.03em]">
               {pitch.business}
             </h2>
-            <Badge variant="outline" className={cn("shrink-0 text-[10px]", style.chip)}>
-              {style.label}
-            </Badge>
+            <Stamp status={pitch.status} />
           </div>
 
-          <div className="mt-2 space-y-1">
-            <Field label="To" value={pitch.to} />
+          <p className="text-muted-foreground/70 mt-1.5 flex items-center gap-1.5 text-xs">
+            <Channel channel={pitch.channel} />
+            {channelOf(pitch.channel).label} · {pitch.trade}
+          </p>
+
+          <div className="mt-4 space-y-1.5">
+            <Field label={pitch.channel === "sms" ? "Number" : "To"} value={pitch.to} />
             <Field label="Site" value={pitch.siteUrl.replace("https://", "")} />
             {pitch.sentAt && <Field label="Sent" value={when(pitch.sentAt)} />}
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           {editable && (
             <Button
               size="sm"
               variant={editing ? "default" : "outline"}
+              className="h-7 text-xs"
               onClick={() => (editing ? void save() : setEditing(true))}
               disabled={saving}
             >
-              <PencilSimpleIcon className="size-4" />
+              <PencilSimpleIcon className="size-3.5" />
               {editing ? "Save" : "Edit"}
             </Button>
           )}
 
           {(pitch.status === "sent" || pitch.status === "replied") && (
             <>
-              <Button size="sm" variant="outline" onClick={() => void mark("won")}>
-                <CheckCircleIcon className="size-4" />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => void mark("won")}
+              >
+                <CheckCircleIcon className="size-3.5" />
                 Won
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => void mark("lost")}>
-                <ProhibitIcon className="size-4" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => void mark("lost")}
+              >
+                <ProhibitIcon className="size-3.5" />
                 Lost
               </Button>
             </>
           )}
 
-          <Button size="sm" variant="ghost" asChild>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
             <a href={pitch.siteUrl} target="_blank" rel="noopener noreferrer">
-              <ArrowSquareOutIcon className="size-4" />
-              Open site
+              <ArrowSquareOutIcon className="size-3.5" />
+              Open
             </a>
           </Button>
         </div>
       </header>
 
-      {/* ---- the email, and the page it is about ---- */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[1fr_360px]">
-        <div className="min-w-0 p-5">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[1fr_20rem]">
+        <div className="min-w-0 px-6 py-6">
           {pitch.error && (
-            <div className="mb-4 flex gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-700 dark:text-red-300">
-              <WarningCircleIcon className="mt-px size-4 shrink-0" />
+            <div className="border-border/70 bg-muted/40 text-muted-foreground mb-5 flex gap-2.5 rounded-lg border p-3 text-xs">
+              <WarningCircleIcon className="text-foreground/60 mt-px size-4 shrink-0" />
               <span>{pitch.error}</span>
             </div>
           )}
 
           {reply && (
-            // Above our own email, not below it. The reply is why the row moved
-            // to the top of the list, and it is what a person opened this to
-            // read — putting it under a hundred and ten words they already
-            // wrote is putting it where nobody looks.
-            <div className="border-border/60 bg-muted/40 mb-5 rounded-xl border p-4">
-              <p className="eyebrow text-muted-foreground/70 mb-2">
-                They replied · {when(reply.at)}
+            // Above our own email. It is why the row moved to the top of the
+            // list, and putting it under a hundred and ten words somebody
+            // already wrote is putting it where nobody looks.
+            <div className="border-border/60 milled bg-muted/40 mb-6 rounded-lg border p-4">
+              <p className="engraved text-muted-foreground/70 mb-2 text-[9px] tracking-[0.28em] uppercase">
+                They wrote back · {when(reply.at)}
               </p>
-              <p className="text-sm whitespace-pre-wrap">{reply.text}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{reply.text}</p>
             </div>
           )}
 
@@ -308,28 +415,33 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
                 className="font-mono text-xs leading-relaxed"
               />
               <p className="text-muted-foreground text-xs">
-                Your address, your name on it. Nothing checks this again after
-                you save.
+                Your address, your name on it. Nothing checks this again after you
+                save.
               </p>
             </div>
           ) : (
-            <article className="max-w-prose">
-              <p className="mb-4 font-medium">{pitch.subject}</p>
-              <p className="text-foreground/90 text-sm leading-relaxed whitespace-pre-wrap">
+            <article className="max-w-[58ch]">
+              <p className="engraved text-muted-foreground/60 text-[9px] tracking-[0.28em] uppercase">
+                Subject
+              </p>
+              <p className="mt-1.5 mb-5 text-[15px] font-medium tracking-[-0.01em]">
+                {pitch.subject}
+              </p>
+              <p className="text-foreground/85 text-sm leading-[1.75] whitespace-pre-wrap">
                 {pitch.body}
               </p>
             </article>
           )}
 
-          {/* What the checker caught, kept rather than thrown away — a check
+          {/* What the checker caught, kept rather than thrown away: a check
               that fired and was overruled is still the only record it fired. */}
           {pitch.write && pitch.write.problems.length > 0 && (
-            <details className="border-border/60 mt-6 rounded-xl border p-3">
-              <summary className="cursor-pointer text-xs font-medium">
+            <details className="border-border/60 mt-8 max-w-[58ch] rounded-lg border p-3">
+              <summary className="engraved text-muted-foreground cursor-pointer text-[9px] tracking-[0.2em] uppercase">
                 The checker had {pitch.write.problems.length} note
                 {pitch.write.problems.length === 1 ? "" : "s"}
               </summary>
-              <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
+              <ul className="text-muted-foreground mt-2.5 space-y-1 text-xs">
                 {pitch.write.problems.map((problem) => (
                   <li key={problem}>{problem}</li>
                 ))}
@@ -338,7 +450,7 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
           )}
 
           {pitch.write && (
-            <p className="text-muted-foreground/60 mt-4 font-mono text-[10px]">
+            <p className="text-muted-foreground/50 mt-5 font-mono text-[10px]">
               {pitch.write.provider} · {pitch.write.tokens} tokens ·{" "}
               {pitch.write.seconds}s
               {pitch.write.rewrites > 0 && ` · rewritten ${pitch.write.rewrites}×`}
@@ -346,19 +458,31 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
           )}
         </div>
 
-        {/* The page itself. Sandboxed and inert — this is a look, not a visit. */}
-        <aside className="border-border/60 hidden min-w-0 border-l p-5 lg:block">
-          <p className="eyebrow text-muted-foreground/70 mb-3">What they will see</p>
-          <div className="border-border/60 bg-background relative aspect-[3/4] overflow-hidden rounded-xl border">
-            <iframe
-              src={pitch.siteUrl}
-              title={pitch.business}
-              loading="lazy"
-              tabIndex={-1}
-              sandbox=""
-              className="pointer-events-none absolute top-0 left-0 origin-top-left border-0"
-              style={{ width: 1280, height: 1700, transform: "scale(0.28)" }}
-            />
+        {/* The page itself, behind a chrome rim — the same bezel the product
+            uses elsewhere for something you look through rather than at.
+            Sandboxed and inert: this is a look, not a visit. */}
+        <aside className="border-border/60 hidden min-w-0 border-l px-5 py-6 lg:block">
+          <p className="engraved text-muted-foreground/60 mb-3 text-[9px] tracking-[0.28em] uppercase">
+            What they will see
+          </p>
+
+          <div
+            className="metal-bezel w-full"
+            style={
+              { "--bezel-radius": "0.85rem", "--bezel-rim": "3px" } as React.CSSProperties
+            }
+          >
+            <div className="bg-background relative aspect-[3/4] overflow-hidden rounded-[0.6rem]">
+              <iframe
+                src={pitch.siteUrl}
+                title={pitch.business}
+                loading="lazy"
+                tabIndex={-1}
+                sandbox=""
+                className="pointer-events-none absolute top-0 left-0 origin-top-left border-0"
+                style={{ width: 1280, height: 1780, transform: "scale(0.213)" }}
+              />
+            </div>
           </div>
         </aside>
       </div>
@@ -370,13 +494,6 @@ const Reader = ({ pitch }: { pitch: Pitch }) => {
  * The screen.
  * -------------------------------------------------------------------------- */
 
-const Stat = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex items-baseline gap-1.5">
-    <span className="font-mono text-sm tabular-nums">{value}</span>
-    <span className="text-muted-foreground/70 text-[11px]">{label}</span>
-  </div>
-);
-
 export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
   const pitches = usePitches(projectId);
   const progress = usePitchProgress(projectId);
@@ -386,9 +503,9 @@ export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
   const [search, setSearch] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
-  // Which of the two lists the column is showing. A tab rather than a second
+  // Which of the two lists the column shows. A tab rather than a second
   // screen, because they are two halves of one question — who has been written
-  // to, and who cannot be — and the answer to the second is most of the patch.
+  // to, and who cannot be — and on a real patch the second is most of it.
   const [tab, setTab] = useState<"pitches" | "stuck">("pitches");
 
   const shown = useMemo(() => {
@@ -409,8 +526,8 @@ export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
   const open = shown.find((pitch) => pitch._id === picked) ?? shown[0];
 
   const run = async (action: "draft" | "send" | "replies") => {
-    // Sending is the one thing on this screen that cannot be undone, so it is
-    // the one thing that asks. Everything else writes to our own database.
+    // Sending is the one thing here that cannot be undone, so it is the one
+    // thing that asks. Everything else writes to our own database.
     if (action === "send") {
       const waiting = (progress?.drafted ?? 0) + (progress?.queued ?? 0);
 
@@ -452,17 +569,24 @@ export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
     }
   };
 
+  const tabs = [
+    ["pitches", "Pitches", pitches?.length ?? 0],
+    ["stuck", "No address", progress?.unreachable ?? 0],
+  ] as const;
+
   return (
     <div className="flex h-full min-h-0 w-full">
       {/* ---- the message column ---- */}
-      <div className="border-border/60 flex w-full max-w-[22rem] shrink-0 flex-col border-r md:w-[22rem]">
-        <div className="border-border/60 flex flex-col gap-3.5 border-b p-4">
+      <div className="border-border/60 flex w-full max-w-[23rem] shrink-0 flex-col border-r md:w-[23rem]">
+        <div className="border-border/60 milled flex flex-col gap-4 border-b px-4 pt-5 pb-3">
           <div className="flex items-center justify-between">
-            <h1 className="font-display headline-display text-base tracking-[-0.02em]">
+            <h1 className="engraved text-foreground/80 text-[10px] tracking-[0.32em] uppercase">
               Pitching
             </h1>
-            <Label className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">Unread</span>
+            <Label className="flex items-center gap-2">
+              <span className="engraved text-muted-foreground/70 text-[9px] tracking-[0.2em] uppercase">
+                Unread
+              </span>
               <Switch
                 checked={unreadOnly}
                 onCheckedChange={setUnreadOnly}
@@ -471,84 +595,33 @@ export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
             </Label>
           </div>
 
-          {progress && (
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <Stat label="drafts" value={progress.drafted} />
-              <Stat label="sent" value={progress.sent} />
-              <Stat label="replied" value={progress.replied} />
-              {progress.unreachable > 0 && (
-                <span
-                  className="text-muted-foreground/70 text-[11px]"
-                  title="Businesses with a site built and no email address anywhere"
-                >
-                  <span className="font-mono tabular-nums">{progress.unreachable}</span>{" "}
-                  no address
-                </span>
-              )}
-            </div>
-          )}
+          {progress && <Gauge progress={progress} />}
 
-          {/* Two tabs, and the second one carries its own count because on a
-              real patch it is the bigger number and hiding that would make the
-              screen a lie by omission. */}
-          <div className="border-border/60 flex gap-4 border-b text-xs">
-            {(
-              [
-                ["pitches", "Pitches", pitches?.length ?? 0],
-                ["stuck", "No address", progress?.unreachable ?? 0],
-              ] as const
-            ).map(([key, label, count]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                className={cn(
-                  "-mb-px border-b-2 pb-2 transition-colors",
-                  tab === key
-                    ? "border-foreground text-foreground"
-                    : "text-muted-foreground hover:text-foreground border-transparent",
-                )}
-              >
-                {label}{" "}
-                <span className="font-mono text-[10px] tabular-nums">{count}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className={cn("relative", tab === "stuck" && "hidden")}>
-            <MagnifyingGlassIcon className="text-muted-foreground/60 absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search businesses"
-              className="h-8 pl-8 text-xs"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex gap-1.5">
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs"
+              className="h-7 flex-1 text-[11px]"
               onClick={() => void run("draft")}
               disabled={running !== null}
             >
-              <EnvelopeSimpleIcon className="size-3.5" />
               Write
             </Button>
+            {/* The one plate of chrome on the screen, on the one control that
+                puts something beyond reach. */}
             <Button
               size="sm"
-              className="h-7 text-xs"
+              className="metal-plate h-7 flex-1 border-0 bg-transparent text-[11px] shadow-none dark:bg-transparent"
               onClick={() => void run("send")}
               disabled={running !== null || (progress?.drafted ?? 0) === 0}
             >
-              <PaperPlaneTiltIcon className="size-3.5" />
-              Send {progress?.drafted ? progress.drafted : ""}
+              <PaperPlaneTiltIcon className="size-3.5" weight="fill" />
+              Send{progress?.drafted ? ` ${progress.drafted}` : ""}
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="h-7 text-xs"
+              className="h-7 text-[11px]"
               onClick={() => void run("replies")}
               disabled={running !== null || (progress?.sent ?? 0) === 0}
             >
@@ -557,19 +630,55 @@ export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
           </div>
         </div>
 
+        <div className="border-border/60 flex items-stretch gap-5 border-b px-4">
+          {tabs.map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={cn(
+                "engraved relative py-2.5 text-[9px] tracking-[0.2em] uppercase transition-colors",
+                tab === key
+                  ? "text-foreground"
+                  : "text-muted-foreground/60 hover:text-muted-foreground",
+              )}
+            >
+              {label}{" "}
+              <span className="font-mono text-[10px] tracking-normal tabular-nums">
+                {count}
+              </span>
+              {tab === key && (
+                <span className="gauge-fill absolute inset-x-0 -bottom-px h-[2px] rounded-full" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {tab === "pitches" && (
+          <div className="border-border/60 relative border-b px-4 py-2.5">
+            <MagnifyingGlassIcon className="text-muted-foreground/50 absolute top-1/2 left-6.5 size-3.5 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search this patch"
+              className="h-7 border-0 bg-transparent pl-6 text-xs shadow-none focus-visible:ring-0"
+            />
+          </div>
+        )}
+
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === "stuck" ? (
             <NoAddressList projectId={projectId} />
           ) : pitches === undefined ? (
-            <div className="space-y-px p-4">
+            <div className="space-y-2 p-4">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="bg-muted/50 h-16 animate-pulse rounded-lg" />
               ))}
             </div>
           ) : shown.length === 0 ? (
-            <p className="text-muted-foreground p-6 text-sm text-balance">
+            <p className="text-muted-foreground px-5 py-8 text-sm text-balance">
               {(pitches?.length ?? 0) === 0
-                ? "No pitches yet. Press Write and one gets drafted for every business you have built a site for."
+                ? "Nothing written yet. Press Write and one email gets drafted for every business you have built a site for."
                 : "Nothing matches that."}
             </p>
           ) : (
@@ -593,8 +702,10 @@ export const PitchInbox = ({ projectId }: { projectId: ProjectId }) => {
         {open ? (
           <Reader key={open._id} pitch={open} />
         ) : (
-          <div className="text-muted-foreground flex h-full items-center justify-center p-10 text-center text-sm text-balance">
-            Pick a business to read what was written to them.
+          <div className="flex h-full items-center justify-center p-10">
+            <p className="text-muted-foreground/70 max-w-xs text-center text-sm text-balance">
+              Pick a business to read what was written to them.
+            </p>
           </div>
         )}
       </div>

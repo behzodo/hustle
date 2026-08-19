@@ -12,6 +12,10 @@ import {
   takeNextPitch,
 } from "@/inngest/convex";
 import { findEmail, readReply, readThread, sendMail, writePitch } from "@/pitch";
+import { routeFor, whyUnreachable } from "@/pitch/channels";
+import { sendText, toE164 } from "@/pitch/twilio";
+import { writeAnswer } from "@/pitch/answer";
+import { appendPitchMessage } from "@/inngest/convex";
 
 /**
  * Working through a hustle's outreach.
@@ -64,6 +68,7 @@ export interface DraftedPitch {
   leadId: string;
   name: string;
   to: string;
+  channel: string;
   subject: string;
   blocked: boolean;
   problems: string[];
@@ -161,11 +166,25 @@ export const draftPitches = async (
           });
         }
 
-        if (!email) {
+        // Which way this one goes. Email where there is an address, a text
+        // where there is only a number — which on a real patch is nineteen
+        // businesses in twenty, because a Google listing has a phone field and
+        // no email field at all.
+        const reach = {
+          canEmail: Boolean(context.sender.gmailConnectionId),
+          canText: Boolean(
+            context.sender.twilioConnectionId && context.sender.twilioNumber,
+          ),
+        };
+
+        const phone = context.phone ? toE164(context.phone) ?? undefined : undefined;
+        const route = routeFor({ email, phone }, reach);
+
+        if (!route) {
           const skip = {
             leadId: lead.leadId,
             name: lead.name,
-            why: "No email address anywhere — needs one typed in, or a phone call",
+            why: whyUnreachable({ email, phone }, reach),
           };
 
           unreachable.push(skip);
@@ -184,6 +203,7 @@ export const draftPitches = async (
             siteUrl: context.siteUrl,
           },
           context.sender,
+          { channel: route.channel },
         );
 
         const seconds = Math.round(((Date.now() - at) / 1000) * 10) / 10;
@@ -191,7 +211,8 @@ export const draftPitches = async (
 
         await saveLeadPitch({
           leadId: lead.leadId,
-          to: email,
+          to: route.to,
+          channel: route.channel,
           subject: composed.subject,
           body: composed.body,
           blocked: composed.blocked,
@@ -207,7 +228,8 @@ export const draftPitches = async (
         const record = {
           leadId: lead.leadId,
           name: lead.name,
-          to: email,
+          to: route.to,
+          channel: route.channel,
           subject: composed.subject,
           blocked: composed.blocked,
           problems,
@@ -289,14 +311,27 @@ export const sendPitches = async (
     if (!next) break;
 
     try {
-      const result = await sendMail(next.connectionId, {
-        to: next.to,
-        subject: next.subject,
-        body: next.body,
-        from: { email: next.from },
-      });
+      if (next.channel === "sms") {
+        const text = await sendText(next.connectionId, {
+          to: next.to,
+          from: next.from,
+          body: next.body,
+        });
 
-      await recordPitchSent({ pitchId: next.pitchId, gmail: result });
+        await recordPitchSent({
+          pitchId: next.pitchId,
+          sms: { messageSid: text.sid, from: next.from },
+        });
+      } else {
+        const result = await sendMail(next.connectionId, {
+          to: next.to,
+          subject: next.subject,
+          body: next.body,
+          from: { email: next.from },
+        });
+
+        await recordPitchSent({ pitchId: next.pitchId, gmail: result });
+      }
 
       const record = { pitchId: next.pitchId, business: next.business, to: next.to };
       sent.push(record);
@@ -364,13 +399,15 @@ export const checkReplies = async (
     const latest = theirs[theirs.length - 1];
     const reading = await readReply(latest.text);
 
+    const thread = messages.map((m) => ({
+      side: m.theirs ? ("them" as const) : ("us" as const),
+      text: m.text,
+      at: m.at,
+    }));
+
     await recordPitchReply({
       pitchId: pitch.pitchId,
-      messages: messages.map((m) => ({
-        side: m.theirs ? ("them" as const) : ("us" as const),
-        text: m.text,
-        at: m.at,
-      })),
+      messages: thread,
       verdict: reading.verdict,
       gist: reading.gist,
     });
@@ -380,6 +417,43 @@ export const checkReplies = async (
       verdict: reading.verdict,
       gist: reading.gist,
     });
+
+    // And answer it, in the same pass. The whole point of polling every minute
+    // rather than when somebody presses a button is that the business gets a
+    // reply while they are still thinking about it.
+    if (!pitch.business || !pitch.siteUrl || !pitch.sender) continue;
+
+    const answer = await writeAnswer({
+      verdict: reading.verdict,
+      thread,
+      business: pitch.business,
+      siteUrl: pitch.siteUrl,
+      sender: pitch.sender,
+      channel: "email",
+    });
+
+    // Nothing to say, or something the checker refused. Both leave the reply
+    // filed and waiting for a person, which is the safe end of the trade: an
+    // answer that is late can be fixed and one that is wrong cannot.
+    if (!answer || answer.blocked) continue;
+
+    try {
+      await sendMail(connectionId, {
+        to: pitch.to,
+        subject: pitch.subject.startsWith("Re:") ? pitch.subject : `Re: ${pitch.subject}`,
+        body: answer.body,
+        from: { email: us },
+        replyTo: { threadId: pitch.threadId, rfcId: pitch.rfcId },
+      });
+
+      await appendPitchMessage({
+        pitchId: pitch.pitchId,
+        side: "us",
+        text: answer.body,
+      });
+    } catch (cause) {
+      console.error(`[pitch] could not answer ${pitch.business}:`, cause);
+    }
   }
 
   return { checked: open.length, replies };

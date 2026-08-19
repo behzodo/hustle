@@ -321,6 +321,7 @@ http.route({
     await ctx.runMutation(internal.pitches.recordSent, {
       pitchId: body.pitchId,
       gmail: body.gmail,
+      sms: body.sms,
       error: body.error,
     });
 
@@ -341,6 +342,40 @@ http.route({
     });
 
     return Response.json({ open });
+  }),
+});
+
+http.route({
+  path: "/pitch/inbound",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+    const found = await ctx.runQuery(internal.pitches.inboundContext, {
+      from: body.from,
+      to: body.to,
+    });
+
+    return Response.json({ found });
+  }),
+});
+
+http.route({
+  path: "/pitch/append",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+
+    const body = await request.json();
+
+    await ctx.runMutation(internal.pitches.appendMessage, {
+      pitchId: body.pitchId,
+      side: body.side,
+      text: body.text,
+    });
+
+    return Response.json({ ok: true });
   }),
 });
 

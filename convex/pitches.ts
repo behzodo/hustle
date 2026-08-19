@@ -4,7 +4,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { requireOwnedProject, requireUserId } from "./lib/auth";
-import { pitchStatus } from "./schema";
+import { pitchChannel, pitchStatus } from "./schema";
 
 /**
  * The pitch lane, from the database's side.
@@ -48,6 +48,7 @@ const pitchShape = v.object({
   to: v.string(),
   subject: v.string(),
   body: v.string(),
+  channel: pitchChannel,
   status: pitchStatus,
   gmail: v.optional(
     v.object({
@@ -56,6 +57,7 @@ const pitchShape = v.object({
       rfcId: v.optional(v.string()),
     }),
   ),
+  sms: v.optional(v.object({ messageSid: v.string(), from: v.string() })),
   thread: v.array(
     v.object({
       side: v.union(v.literal("us"), v.literal("them")),
@@ -99,6 +101,7 @@ export const context = internalQuery({
       categories: v.array(v.string()),
       town: v.optional(v.string()),
       website: v.optional(v.string()),
+      phone: v.optional(v.string()),
       presence: v.string(),
       siteUrl: v.string(),
       projectId: v.id("projects"),
@@ -113,6 +116,8 @@ export const context = internalQuery({
         priceBand: v.optional(v.string()),
         gmailConnectionId: v.optional(v.string()),
         gmailEmail: v.optional(v.string()),
+        twilioConnectionId: v.optional(v.string()),
+        twilioNumber: v.optional(v.string()),
       }),
       // Set when this business has already been written to. The queue skips
       // it rather than writing a second cold email to the same person.
@@ -142,6 +147,7 @@ export const context = internalQuery({
       categories: lead.categories,
       town: project?.area?.label,
       website: lead.website,
+      phone: lead.phone,
       presence: lead.presence,
       siteUrl: lead.site.url,
       projectId: lead.projectId,
@@ -158,6 +164,10 @@ export const context = internalQuery({
         priceBand: profile?.priceBand,
         gmailConnectionId: profile?.gmailConnectionId,
         gmailEmail: profile?.gmailEmail,
+        twilioConnectionId: profile?.twilioConnectionId,
+        // A connected Twilio account with no number bought cannot send
+        // anything, so both have to be present before texting counts.
+        twilioNumber: profile?.twilioNumber,
       },
       pitched: Boolean(existing),
     };
@@ -197,6 +207,7 @@ export const saveDraft = internalMutation({
     to: v.string(),
     subject: v.string(),
     body: v.string(),
+    channel: pitchChannel,
     blocked: v.boolean(),
     write: v.object({
       provider: v.string(),
@@ -207,7 +218,7 @@ export const saveDraft = internalMutation({
     }),
   },
   returns: v.union(v.id("pitches"), v.null()),
-  handler: async (ctx, { leadId, to, subject, body, blocked, write }) => {
+  handler: async (ctx, { leadId, to, subject, body, channel, blocked, write }) => {
     const lead = await ctx.db.get(leadId);
     if (!lead?.site?.url) return null;
 
@@ -227,6 +238,7 @@ export const saveDraft = internalMutation({
       to,
       subject,
       body,
+      channel,
       // A blocked draft is stored, not thrown away. The refused text and the
       // reason for refusing it are both worth reading, and the alternative is
       // a business that silently never gets pitched.
@@ -351,6 +363,7 @@ export const takeNext = internalMutation({
       to: v.string(),
       subject: v.string(),
       body: v.string(),
+      channel: pitchChannel,
       connectionId: v.string(),
       from: v.string(),
     }),
@@ -392,12 +405,30 @@ export const takeNext = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", next.userId))
       .first();
 
-    if (!profile?.gmailConnectionId || !profile.gmailEmail) {
-      // No inbox to send from. Failed rather than left queued, so the screen
+    // Whichever channel this pitch was written for, and only that one. A text
+    // rewritten as an email is a different message, and one that has already
+    // been checked as a text.
+    const sending =
+      next.channel === "sms"
+        ? {
+            connectionId: profile?.twilioConnectionId,
+            from: profile?.twilioNumber,
+            missing:
+              "No texting number yet. Connect Twilio and buy one on the connections screen.",
+          }
+        : {
+            connectionId: profile?.gmailConnectionId,
+            from: profile?.gmailEmail,
+            missing:
+              "No Gmail account is connected. Connect one on the connections screen.",
+          };
+
+    if (!sending.connectionId || !sending.from) {
+      // Nothing to send from. Failed rather than left queued, so the screen
       // says why instead of showing a queue that never moves.
       await ctx.db.patch(next._id, {
         status: "failed",
-        error: "No Gmail account is connected. Connect one on the connections screen.",
+        error: sending.missing,
         updatedAt: now,
       });
 
@@ -412,8 +443,9 @@ export const takeNext = internalMutation({
       to: next.to,
       subject: next.subject,
       body: next.body,
-      connectionId: profile.gmailConnectionId,
-      from: profile.gmailEmail,
+      channel: next.channel,
+      connectionId: sending.connectionId,
+      from: sending.from,
     };
   },
 });
@@ -429,16 +461,17 @@ export const recordSent = internalMutation({
         rfcId: v.optional(v.string()),
       }),
     ),
+    sms: v.optional(v.object({ messageSid: v.string(), from: v.string() })),
     error: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, { pitchId, gmail, error }) => {
+  handler: async (ctx, { pitchId, gmail, sms, error }) => {
     const pitch = await ctx.db.get(pitchId);
     if (!pitch) return null;
 
     const now = Date.now();
 
-    if (!gmail) {
+    if (!gmail && !sms) {
       await ctx.db.patch(pitchId, {
         status: "failed",
         error: error ?? "Sending failed",
@@ -451,7 +484,8 @@ export const recordSent = internalMutation({
 
     await ctx.db.patch(pitchId, {
       status: "sent",
-      gmail,
+      ...(gmail ? { gmail } : {}),
+      ...(sms ? { sms } : {}),
       sentAt: now,
       startedAt: undefined,
       error: undefined,
@@ -713,6 +747,19 @@ export const awaitingReply = internalQuery({
       pitchId: v.id("pitches"),
       threadId: v.string(),
       known: v.number(),
+      // Everything the answer needs, so the poller does not read the row again
+      // for each of a hundred open conversations.
+      to: v.string(),
+      subject: v.string(),
+      business: v.string(),
+      siteUrl: v.string(),
+      rfcId: v.optional(v.string()),
+      sender: v.object({
+        tradingName: v.string(),
+        city: v.optional(v.string()),
+        tone: v.optional(v.string()),
+        priceBand: v.optional(v.string()),
+      }),
     }),
   ),
   handler: async (ctx, { projectId }) => {
@@ -723,15 +770,188 @@ export const awaitingReply = internalQuery({
       )
       .collect();
 
-    return sent
-      .filter((pitch) => pitch.gmail?.threadId)
-      .map((pitch) => ({
-        pitchId: pitch._id,
-        threadId: pitch.gmail!.threadId,
-        // How many messages we already know about, so the poller can tell a
-        // thread that has moved from one that has not without re-reading it.
-        known: pitch.thread.length,
-      }));
+    const open = sent.filter((pitch) => pitch.gmail?.threadId);
+    if (open.length === 0) return [];
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", open[0].userId))
+      .first();
+
+    const sender = {
+      tradingName: profile?.tradingName ?? "",
+      city: profile?.city,
+      tone: profile?.tone,
+      priceBand: profile?.priceBand,
+    };
+
+    return open.map((pitch) => ({
+      pitchId: pitch._id,
+      threadId: pitch.gmail!.threadId,
+      // How many messages we already know about, so the poller can tell a
+      // thread that has moved from one that has not without re-reading it.
+      known: pitch.thread.length,
+      to: pitch.to,
+      subject: pitch.subject,
+      business: pitch.business,
+      siteUrl: pitch.siteUrl,
+      rfcId: pitch.gmail!.rfcId,
+      sender,
+    }));
+  },
+});
+
+/**
+ * Finds the conversation an inbound text belongs to.
+ *
+ * A text carries two facts and no more: the number it came from, and the
+ * number it was sent to. The second identifies whose account it is — hence the
+ * index on `twilioNumber` — and the first identifies the business, matched
+ * against what we texted. There is no thread id and nothing to correlate on,
+ * which is why the pitch stores the destination it actually used rather than
+ * reading it back off the lead each time.
+ *
+ * Returns the Twilio connection alongside, because the caller has to verify
+ * the webhook signature before trusting a word of it and the key for that
+ * lives on the connection.
+ */
+export const inboundContext = internalQuery({
+  args: { from: v.string(), to: v.string() },
+  returns: v.union(
+    v.object({
+      pitchId: v.optional(v.id("pitches")),
+      userId: v.string(),
+      connectionId: v.string(),
+      business: v.optional(v.string()),
+      siteUrl: v.optional(v.string()),
+      thread: v.array(
+        v.object({
+          side: v.union(v.literal("us"), v.literal("them")),
+          text: v.string(),
+          at: v.number(),
+        }),
+      ),
+      sender: v.object({
+        tradingName: v.string(),
+        city: v.optional(v.string()),
+        tone: v.optional(v.string()),
+        priceBand: v.optional(v.string()),
+      }),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { from, to }) => {
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_twilio_number", (q) => q.eq("twilioNumber", to))
+      .first();
+
+    if (!profile?.twilioConnectionId) return null;
+
+    // Most recent first: a business pitched twice over two patches should have
+    // its reply filed against the conversation it is actually answering.
+    const pitch = await ctx.db
+      .query("pitches")
+      .withIndex("by_user_and_to", (q) => q.eq("userId", profile.userId).eq("to", from))
+      .order("desc")
+      .first();
+
+    return {
+      pitchId: pitch?._id,
+      userId: profile.userId,
+      connectionId: profile.twilioConnectionId,
+      business: pitch?.business,
+      siteUrl: pitch?.siteUrl,
+      thread: pitch?.thread ?? [],
+      sender: {
+        tradingName: profile.tradingName,
+        city: profile.city,
+        tone: profile.tone,
+        priceBand: profile.priceBand,
+      },
+    };
+  },
+});
+
+/**
+ * Every mailbox with a conversation still open, across every hustle.
+ *
+ * What the minute-by-minute poll works from. Grouped by user rather than by
+ * project because the thing being polled is a Gmail account, and a user with
+ * four hustles has one inbox, not four.
+ */
+export const openMailboxes = internalQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      userId: v.string(),
+      projectId: v.id("projects"),
+      connectionId: v.string(),
+      email: v.string(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const open = await ctx.db
+      .query("pitches")
+      .withIndex("by_status_and_updated", (q) => q.eq("status", "sent"))
+      .order("desc")
+      .take(500);
+
+    const seen = new Set<string>();
+    const out: {
+      userId: string;
+      projectId: Id<"projects">;
+      connectionId: string;
+      email: string;
+    }[] = [];
+
+    for (const pitch of open) {
+      // Email only. A text is answered by its webhook the moment it lands, so
+      // polling for one would be a second, slower copy of a thing that already
+      // happened.
+      if (pitch.channel !== "email") continue;
+
+      const key = `${pitch.userId}:${pitch.projectId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", pitch.userId))
+        .first();
+
+      if (!profile?.gmailConnectionId || !profile.gmailEmail) continue;
+
+      out.push({
+        userId: pitch.userId,
+        projectId: pitch.projectId,
+        connectionId: profile.gmailConnectionId,
+        email: profile.gmailEmail,
+      });
+    }
+
+    return out;
+  },
+});
+
+/** Adds one message to a thread, whichever side wrote it. */
+export const appendMessage = internalMutation({
+  args: {
+    pitchId: v.id("pitches"),
+    side: v.union(v.literal("us"), v.literal("them")),
+    text: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { pitchId, side, text }) => {
+    const pitch = await ctx.db.get(pitchId);
+    if (!pitch) return null;
+
+    await ctx.db.patch(pitchId, {
+      thread: [...pitch.thread, { side, text, at: Date.now() }],
+      updatedAt: Date.now(),
+    });
+
+    return null;
   },
 });
 

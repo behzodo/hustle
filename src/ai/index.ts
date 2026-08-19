@@ -137,7 +137,11 @@ export interface JsonResult<T> {
  * near miss, and the caller has a better fallback than a third try.
  */
 export const askJson = async <T>(
-  schema: z.ZodType<T>,
+  // The input side is `unknown` rather than `T`, so a schema that transforms
+  // on the way through is accepted as readily as a plain one. What the model
+  // returns is untyped JSON either way; the only thing a caller cares about is
+  // what comes out.
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
   options: AskOptions,
   attempts = 2,
 ): Promise<JsonResult<T>> => {

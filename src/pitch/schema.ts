@@ -44,3 +44,17 @@ export const PitchDraftSchema = z.object({
 });
 
 export type PitchDraft = z.infer<typeof PitchDraftSchema>;
+
+/**
+ * A text, which has no subject line to get wrong.
+ *
+ * The length ceiling is here rather than only in ./check because it is the one
+ * rule with a price on it: a text over 160 GSM-7 characters is billed as two,
+ * and one over 320 as three. 300 leaves room for the sign-off and opt-out that
+ * are appended afterwards without tipping into a third segment.
+ */
+export const SmsDraftSchema = z.object({
+  body: z.string().trim().min(40).max(300),
+});
+
+export type SmsDraft = z.infer<typeof SmsDraftSchema>;

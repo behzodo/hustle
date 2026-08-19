@@ -10,6 +10,7 @@ import {
 } from "./_generated/server";
 import { huntQueryValidator, webPresence } from "./schema";
 import { requireOwnedProject, requireUserId } from "./lib/auth";
+import { leadFields } from "./schema";
 import { PlacesError, provider, searchPlaces } from "./lib/places";
 import {
   PAGES_PER_QUERY,
@@ -85,65 +86,21 @@ const huntShape = v.object({
   provider: v.optional(v.string()),
 });
 
+/**
+ * A lead, as the browser gets one.
+ *
+ * Spread from the schema rather than restated. A `returns` validator is
+ * exact — a field present on the document and absent here is a thrown error,
+ * not an omission — and this was written out by hand twice, and was wrong
+ * both times: once when the fast lane added `site`, once when the pitch lane
+ * added `contact`. Each time it took the whole hustle screen down for every
+ * business that had been touched. A list kept in step by hand is a list that
+ * goes out of step; this one cannot.
+ */
 const leadShape = v.object({
   _id: v.id("leads"),
   _creationTime: v.number(),
-  projectId: v.id("projects"),
-  userId: v.string(),
-  huntId: v.id("hunts"),
-  placeId: v.string(),
-  name: v.string(),
-  lat: v.number(),
-  lng: v.number(),
-  address: v.optional(v.string()),
-  phone: v.optional(v.string()),
-  website: v.optional(v.string()),
-  presence: webPresence,
-  target: v.boolean(),
-  socialKind: v.optional(v.string()),
-  rating: v.optional(v.number()),
-  reviewCount: v.optional(v.number()),
-  categories: v.array(v.string()),
-  photo: v.optional(v.string()),
-  score: v.number(),
-  term: v.string(),
-  // The site built for this business, and where it is in the queue.
-  //
-  // A `returns` validator on a query is exact: a field present on the document
-  // and absent here is a thrown error, not an omission. So these have to be
-  // restated whenever convex/schema.ts grows a column on `leads`, and the day
-  // this was written they were not — which took the whole Building screen down
-  // for every business the fast lane had already built.
-  site: v.optional(
-    v.object({
-      slug: v.string(),
-      url: v.string(),
-      template: v.string(),
-      publishedAt: v.number(),
-      build: v.optional(
-        v.object({
-          provider: v.string(),
-          tokens: v.number(),
-          repairs: v.number(),
-          seconds: v.number(),
-          headline: v.string(),
-          services: v.array(v.string()),
-          problems: v.array(v.string()),
-          photo: v.optional(v.string()),
-        }),
-      ),
-    }),
-  ),
-  siteStatus: v.optional(
-    v.union(
-      v.literal("queued"),
-      v.literal("building"),
-      v.literal("live"),
-      v.literal("failed"),
-    ),
-  ),
-  siteError: v.optional(v.string()),
-  siteStartedAt: v.optional(v.number()),
+  ...leadFields,
 });
 
 /** A listing as the sweep hands it to the writer. */

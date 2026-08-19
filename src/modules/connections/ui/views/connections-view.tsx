@@ -8,18 +8,46 @@ import {
 import { cn } from "@/lib/utils";
 import { SilkBackdrop } from "@/components/silk-backdrop";
 import { GmailConnection } from "@/modules/connections/ui/gmail-connection";
+import { TextingConnection } from "@/modules/connections/ui/texting-connection";
+import {
+  FacebookConnection,
+  InstagramConnection,
+} from "@/modules/connections/ui/social-connections";
 import { StripeConnection } from "@/modules/connections/ui/stripe-connection";
 import type { StripeStatus } from "@/modules/connections/server/stripe-status";
 
 interface Props {
   gmailConnected: boolean;
+  textingConnected: boolean;
+  /** The number texts go out from, once one has been bought. */
+  textingNumber?: string;
+  instagramConnected: boolean;
+  facebookConnected: boolean;
   stripeStatus: StripeStatus;
 }
 
-export const ConnectionsView = ({ gmailConnected, stripeStatus }: Props) => {
+export const ConnectionsView = ({
+  gmailConnected,
+  textingConnected,
+  textingNumber,
+  instagramConnected,
+  facebookConnected,
+  stripeStatus,
+}: Props) => {
   const stripeReady = stripeStatus === "ready";
-  const live = Number(gmailConnected) + Number(stripeReady);
-  const complete = live === 2;
+
+  // Texting only counts once a number has been bought. A connected account
+  // with no number cannot send anything, and a meter that says otherwise is a
+  // meter telling the user they are ready when they are not.
+  const canText = textingConnected && Boolean(textingNumber);
+
+  // The meter counts the three that have to be true before a pound can be
+  // earned: something to send from, and somewhere to be paid. Instagram and
+  // Facebook are not on it — they only ever receive, so a hustle without them
+  // is not incomplete.
+  const rungs = [gmailConnected || canText, canText, stripeReady];
+  const live = rungs.filter(Boolean).length;
+  const complete = live === rungs.length;
 
   // Each step unlocks with the connection that powers it. Building needs
   // nothing, so it starts done — the sequence should read as already moving
@@ -34,8 +62,8 @@ export const ConnectionsView = ({ gmailConnected, stripeStatus }: Props) => {
     {
       icon: EnvelopeSimpleIcon,
       title: "Pitch",
-      body: "Outreach sends from your own Gmail, so it lands like a person wrote it.",
-      done: gmailConnected,
+      body: "Email lands like a person wrote it. Texting reaches the ones with no email at all.",
+      done: gmailConnected || canText,
     },
     {
       icon: ReceiptIcon,
@@ -63,7 +91,7 @@ export const ConnectionsView = ({ gmailConnected, stripeStatus }: Props) => {
               </>
             ) : (
               <>
-                Two accounts,{" "}
+                A way in,{" "}
                 <span className="headline-figure text-primary italic">
                   paid
                 </span>{" "}
@@ -81,7 +109,7 @@ export const ConnectionsView = ({ gmailConnected, stripeStatus }: Props) => {
             connections, the bar IS the checklist. */}
           <div className="mt-5 flex items-center gap-3">
             <div className="flex flex-1 gap-1.5">
-              {[gmailConnected, stripeReady].map((done, i) => (
+              {rungs.map((done, i) => (
                 <span
                   key={i}
                   className={cn(
@@ -95,14 +123,37 @@ export const ConnectionsView = ({ gmailConnected, stripeStatus }: Props) => {
               <span className="text-foreground font-medium tabular-nums">
                 {live}
               </span>{" "}
-              of 2 connected
+              of {rungs.length} connected
             </span>
           </div>
         </div>
 
+        {/* Ordered by what reaches the most businesses. Texting is first
+          because three in a hundred have an email and all of them have a
+          phone — the order of this list is the order of the numbers. */}
         <div className="space-y-3">
+          <TextingConnection
+            connected={textingConnected}
+            number={textingNumber}
+          />
           <GmailConnection connected={gmailConnected} />
           <StripeConnection status={stripeStatus} />
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="eyebrow text-muted-foreground/70 font-medium">
+              For replies
+            </p>
+            <p className="text-muted-foreground mt-1.5 text-sm text-balance">
+              Neither can start a conversation — Meta does not allow a business
+              to message somebody first. Connect them so a shop that answers on
+              Instagram lands in the same inbox as everyone else.
+            </p>
+          </div>
+
+          <InstagramConnection connected={instagramConnected} />
+          <FacebookConnection connected={facebookConnected} />
         </div>
 
         {/* The sequence the two accounts sit inside. Numbered like a contents

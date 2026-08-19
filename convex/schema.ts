@@ -45,6 +45,20 @@ export const huntQueryValidator = v.object({
   zoom: v.number(),
 });
 
+// How a pitch reaches the business.
+//
+// Email is what a Google listing never gives us and SMS is what it always
+// does, which is the whole reason there is more than one of these. The two
+// social channels can only ever carry a reply — Meta does not permit a
+// business to message somebody who has not messaged it first — so a pitch is
+// never created on one; a thread simply arrives there.
+export const pitchChannel = v.union(
+  v.literal("email"),
+  v.literal("sms"),
+  v.literal("instagram"),
+  v.literal("facebook"),
+);
+
 // Where a pitch has got to.
 //
 // "sending" is a claim rather than a fact, the same as a lead's "building":
@@ -76,6 +90,204 @@ export const webPresence = v.union(
   // absent one means unrecorded rather than non-existent.
   v.literal("unknown"),
 );
+
+/**
+ * Everything stored about a business the sweep found.
+ *
+ * Pulled out of the table definition and exported because a Convex query's
+ * `returns` validator is exact: a field on the document and absent from the
+ * validator is a thrown error, not an omission. convex/discovery.ts returns
+ * whole lead documents, so every column added here has to appear there too —
+ * and twice now it has not, each time taking the whole hustle screen down for
+ * every business the fast lane had already touched. Restating a validator by
+ * hand is a promise nobody keeps; spreading this one is a promise the
+ * compiler keeps.
+ */
+export const leadFields = {
+  projectId: v.id("projects"),
+  userId: v.string(),
+  huntId: v.id("hunts"),
+  // Google's id for the listing. The same business turns up in several
+  // overlapping tiles and under several search terms, so this is what stops
+  // one shop becoming six leads.
+  placeId: v.string(),
+  name: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  address: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  // Whatever the listing linked, if anything — including the Facebook page
+  // or Linktree that counts as a gap rather than a site.
+  website: v.optional(v.string()),
+  presence: webPresence,
+  // `presence !== "site"`, stored rather than derived so the working list
+  // can be an index range instead of a table scan that filters afterwards.
+  target: v.boolean(),
+  // Which platform, when `presence` is "social". A SocialKind slug.
+  socialKind: v.optional(v.string()),
+  rating: v.optional(v.number()),
+  reviewCount: v.optional(v.number()),
+  // Google's own categories, e.g. ["Hair salon", "Barber shop"].
+  categories: v.array(v.string()),
+  // A picture of the place, on Google's CDN. Came free with the search that
+  // found it — see MapsPlace.photo.
+  //
+  // The URL is stored rather than the image. Copying a few hundred thumbnails
+  // per sweep into file storage would make a sweep slower and heavier for a
+  // picture the user may look at once. The cost is that these URLs carry a
+  // token and can eventually stop resolving, so the card treats a photo as
+  // something that might not load rather than something that will.
+  photo: v.optional(v.string()),
+  // 0–100, worth-pitching-ness. See scoreLead().
+  score: v.number(),
+  // The search phrase that turned it up, so a surprising lead can be
+  // explained rather than mistrusted.
+  term: v.string(),
+  // The site built for this business, once one has been.
+  //
+  // Every lead gets its own — that is the product. A hustle is a patch of a
+  // town and a lead is one shop in it, so the address belongs to the shop
+  // and not to the sweep that found it.
+  //
+  // Claimed on the first build and never moved afterwards, for the same
+  // reason as projects.site: it is what went in an email.
+  site: v.optional(
+    v.object({
+      slug: v.string(),
+      url: v.string(),
+      // Which of the four looks was used, so a rebuild is consistent and a
+      // template that turns out to be wrong for a trade can be found again.
+      template: v.string(),
+      publishedAt: v.number(),
+      // What the robot did to get here.
+      //
+      // Kept because the page it produced is not the whole story and the
+      // rest of it is otherwise thrown away: which model wrote it, what the
+      // checks caught, whether it had to be corrected, what the photograph
+      // turned out to be. That is the difference between a screen that says
+      // a site exists and one that can be opened up and understood — and it
+      // is the only record of a check having fired, since the fix lands in
+      // the copy and leaves no trace there.
+      //
+      // Optional: every site built before this was stored has none.
+      build: v.optional(
+        v.object({
+          provider: v.string(),
+          tokens: v.number(),
+          repairs: v.number(),
+          seconds: v.number(),
+          headline: v.string(),
+          services: v.array(v.string()),
+          // What the checker caught, in its own words. Empty is the normal
+          // case and is worth showing as much as a full one.
+          problems: v.array(v.string()),
+          // What the photograph was judged to be, or why it was not used.
+          photo: v.optional(v.string()),
+        }),
+      ),
+    }),
+  ),
+  // Where this lead is in the build queue. Absent means never queued —
+  // which is every lead swept before the fast lane existed.
+  siteStatus: v.optional(
+    v.union(
+      v.literal("queued"),
+      v.literal("building"),
+      v.literal("live"),
+      v.literal("failed"),
+    ),
+  ),
+  // Why it failed, shown on the card. A lead that failed silently looks
+  // identical to one nobody has got to yet.
+  siteError: v.optional(v.string()),
+  // When the current build started.
+  //
+  // Only meaningful while `siteStatus` is "building", and it exists because
+  // that status is a claim rather than a fact: a worker that dies mid-build
+  // never clears it, and without a time to compare against, the business it
+  // was working on stays claimed by nobody forever. See STALE_BUILD_MS.
+  siteStartedAt: v.optional(v.number()),
+  // Where to send the pitch.
+  //
+  // Not on the listing. Google Maps gives a phone number and never an email,
+  // which is the one fact that decides the shape of this whole lane: the
+  // business has to be found a second time, on whatever page they do have,
+  // or the address has to be typed in by hand.
+  //
+  // `checkedAt` is what stops that search repeating. A business with no
+  // email anywhere is the common case, and without a record of having
+  // looked, every run would look again — a few hundred fetches to learn
+  // the same nothing.
+  contact: v.optional(
+    v.object({
+      email: v.optional(v.string()),
+      // "social", "website", "manual". Kept because a hand-typed address is
+      // worth more trust than one regexed off a Linktree, and because an
+      // address that bounces should be explainable.
+      source: v.optional(v.string()),
+      checkedAt: v.optional(v.number()),
+    }),
+  ),
+};
+
+/**
+ * Who the user is, and which accounts they have connected.
+ *
+ * Exported for the same reason `leadFields` is: convex/profiles.ts returns
+ * whole profile documents behind an exact `returns` validator, and a column
+ * added here and forgotten there is a thrown error rather than an omission.
+ * Spreading it is a promise the compiler keeps.
+ */
+export const profileFields = {
+  userId: v.string(),
+  // Signs every pitch and brands the sites they send.
+  tradingName: v.string(),
+  // Experience slug — how much hand-holding the guidance gives.
+  experience: v.string(),
+  // Where they sell. Drives which businesses we look for.
+  city: v.string(),
+  // Trade slugs from ONBOARDING_INDUSTRIES.
+  industries: v.array(v.string()),
+  // Price band slug — the number the pitch anchors to.
+  priceBand: v.string(),
+  // Tone slug — the register of the generated site copy and outreach.
+  tone: v.string(),
+
+  // --- Connections. Optional: set on the connections screen after
+  // onboarding, and skippable, so every field here is nullable.
+
+  // Nango connection id for the user's Gmail account. Nango holds the
+  // OAuth tokens and refreshes them; we only keep the handle. Absent
+  // until they finish the Google consent flow.
+  gmailConnectionId: v.optional(v.string()),
+  // The Google address that was connected, shown on the connections
+  // screen so they can see which inbox pitches will send from.
+  gmailEmail: v.optional(v.string()),
+  // Stripe connected account id, once they finish Connect onboarding.
+  stripeAccountId: v.optional(v.string()),
+
+  // Their own Twilio account, connected through our screen.
+  //
+  // White-label by construction rather than by branding: the credentials are
+  // theirs, the number is bought on their account, and the bill and the
+  // sending reputation are theirs too. We hold a Nango connection id and the
+  // number we provisioned, and nothing else — no SID, no auth token.
+  twilioConnectionId: v.optional(v.string()),
+  // The number texts go out from, in E.164. Absent until one is bought.
+  twilioNumber: v.optional(v.string()),
+  // Twilio's id for it, so it can be released or re-pointed later.
+  twilioNumberSid: v.optional(v.string()),
+
+  // Meta, for the inbox rather than for outreach.
+  //
+  // Neither of these can start a conversation: the Instagram and Facebook
+  // messaging APIs only permit a reply, and only inside the window that
+  // opens when a person messages the business first. See CAN_START in
+  // src/lib/nango.ts. They are here so that a business that saw its site and
+  // answered on Instagram lands in the same inbox as everyone else.
+  instagramConnectionId: v.optional(v.string()),
+  facebookConnectionId: v.optional(v.string()),
+};
 
 export default defineSchema({
   projects: defineTable({
@@ -192,132 +404,7 @@ export default defineSchema({
   // They are the denominator: "41 of 260 have no site" is the number that
   // tells a user whether the patch is worth working, and a table holding only
   // the hits cannot produce it. `presence` is what separates the two.
-  leads: defineTable({
-    projectId: v.id("projects"),
-    userId: v.string(),
-    huntId: v.id("hunts"),
-    // Google's id for the listing. The same business turns up in several
-    // overlapping tiles and under several search terms, so this is what stops
-    // one shop becoming six leads.
-    placeId: v.string(),
-    name: v.string(),
-    lat: v.number(),
-    lng: v.number(),
-    address: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    // Whatever the listing linked, if anything — including the Facebook page
-    // or Linktree that counts as a gap rather than a site.
-    website: v.optional(v.string()),
-    presence: webPresence,
-    // `presence !== "site"`, stored rather than derived so the working list
-    // can be an index range instead of a table scan that filters afterwards.
-    target: v.boolean(),
-    // Which platform, when `presence` is "social". A SocialKind slug.
-    socialKind: v.optional(v.string()),
-    rating: v.optional(v.number()),
-    reviewCount: v.optional(v.number()),
-    // Google's own categories, e.g. ["Hair salon", "Barber shop"].
-    categories: v.array(v.string()),
-    // A picture of the place, on Google's CDN. Came free with the search that
-    // found it — see MapsPlace.photo.
-    //
-    // The URL is stored rather than the image. Copying a few hundred thumbnails
-    // per sweep into file storage would make a sweep slower and heavier for a
-    // picture the user may look at once. The cost is that these URLs carry a
-    // token and can eventually stop resolving, so the card treats a photo as
-    // something that might not load rather than something that will.
-    photo: v.optional(v.string()),
-    // 0–100, worth-pitching-ness. See scoreLead().
-    score: v.number(),
-    // The search phrase that turned it up, so a surprising lead can be
-    // explained rather than mistrusted.
-    term: v.string(),
-    // The site built for this business, once one has been.
-    //
-    // Every lead gets its own — that is the product. A hustle is a patch of a
-    // town and a lead is one shop in it, so the address belongs to the shop
-    // and not to the sweep that found it.
-    //
-    // Claimed on the first build and never moved afterwards, for the same
-    // reason as projects.site: it is what went in an email.
-    site: v.optional(
-      v.object({
-        slug: v.string(),
-        url: v.string(),
-        // Which of the four looks was used, so a rebuild is consistent and a
-        // template that turns out to be wrong for a trade can be found again.
-        template: v.string(),
-        publishedAt: v.number(),
-        // What the robot did to get here.
-        //
-        // Kept because the page it produced is not the whole story and the
-        // rest of it is otherwise thrown away: which model wrote it, what the
-        // checks caught, whether it had to be corrected, what the photograph
-        // turned out to be. That is the difference between a screen that says
-        // a site exists and one that can be opened up and understood — and it
-        // is the only record of a check having fired, since the fix lands in
-        // the copy and leaves no trace there.
-        //
-        // Optional: every site built before this was stored has none.
-        build: v.optional(
-          v.object({
-            provider: v.string(),
-            tokens: v.number(),
-            repairs: v.number(),
-            seconds: v.number(),
-            headline: v.string(),
-            services: v.array(v.string()),
-            // What the checker caught, in its own words. Empty is the normal
-            // case and is worth showing as much as a full one.
-            problems: v.array(v.string()),
-            // What the photograph was judged to be, or why it was not used.
-            photo: v.optional(v.string()),
-          }),
-        ),
-      }),
-    ),
-    // Where this lead is in the build queue. Absent means never queued —
-    // which is every lead swept before the fast lane existed.
-    siteStatus: v.optional(
-      v.union(
-        v.literal("queued"),
-        v.literal("building"),
-        v.literal("live"),
-        v.literal("failed"),
-      ),
-    ),
-    // Why it failed, shown on the card. A lead that failed silently looks
-    // identical to one nobody has got to yet.
-    siteError: v.optional(v.string()),
-    // When the current build started.
-    //
-    // Only meaningful while `siteStatus` is "building", and it exists because
-    // that status is a claim rather than a fact: a worker that dies mid-build
-    // never clears it, and without a time to compare against, the business it
-    // was working on stays claimed by nobody forever. See STALE_BUILD_MS.
-    siteStartedAt: v.optional(v.number()),
-    // Where to send the pitch.
-    //
-    // Not on the listing. Google Maps gives a phone number and never an email,
-    // which is the one fact that decides the shape of this whole lane: the
-    // business has to be found a second time, on whatever page they do have,
-    // or the address has to be typed in by hand.
-    //
-    // `checkedAt` is what stops that search repeating. A business with no
-    // email anywhere is the common case, and without a record of having
-    // looked, every run would look again — a few hundred fetches to learn
-    // the same nothing.
-    contact: v.optional(
-      v.object({
-        email: v.optional(v.string()),
-        // "social", "website", "manual". Kept because a hand-typed address is
-        // worth more trust than one regexed off a Linktree, and because an
-        // address that bounces should be explainable.
-        source: v.optional(v.string()),
-        checkedAt: v.optional(v.number()),
-      }),
-    ),
-  })
+  leads: defineTable(leadFields)
     .index("by_project", ["projectId"])
     // Shares one namespace with projects.site.slug — both publish under the
     // same domain, so both claims check both tables. See convex/sites.ts.
@@ -361,9 +448,15 @@ export default defineSchema({
     // than read off the lead because this is the link that was actually sent.
     siteUrl: v.string(),
 
+    // The address, the phone number, or the handle — whichever the channel
+    // below needs. One column rather than three, because a pitch has exactly
+    // one destination and three nullable ones would only ever disagree.
     to: v.string(),
+    // Empty for SMS and for a DM, which have no such thing. Kept required so
+    // nothing has to branch on its absence to render a row.
     subject: v.string(),
     body: v.string(),
+    channel: pitchChannel,
     status: pitchStatus,
 
     // Gmail's own ids, once it has accepted the message.
@@ -379,6 +472,18 @@ export default defineSchema({
         // RFC 2822 Message-ID, which is what In-Reply-To has to carry. Gmail's
         // own id is not the same thing and will not thread.
         rfcId: v.optional(v.string()),
+      }),
+    ),
+
+    // Twilio's id for the outbound text, and the number it went out from.
+    //
+    // The number is stored on the pitch rather than read off the profile,
+    // because a user who changes number later still needs the thread that was
+    // started on the old one to keep matching inbound replies to it.
+    sms: v.optional(
+      v.object({
+        messageSid: v.string(),
+        from: v.string(),
       }),
     ),
 
@@ -426,7 +531,16 @@ export default defineSchema({
     // worth having: an inbox is a place, not a property of a patch.
     .index("by_user_and_updated", ["userId", "updatedAt"])
     // Matching an incoming reply to the pitch it answers.
-    .index("by_thread", ["gmail.threadId"]),
+    .index("by_thread", ["gmail.threadId"])
+    // The same job for a text, where the only thing an inbound message carries
+    // is the number it came from. Scoped by user because two of them working
+    // neighbouring towns can hold the same business, and the reply belongs to
+    // whichever of them actually texted it.
+    .index("by_user_and_to", ["userId", "to"])
+    // Every open conversation across every hustle, for the minute-by-minute
+    // poll. Not scoped to a project, because the cron does not know which
+    // projects have anything waiting until it looks.
+    .index("by_status_and_updated", ["status", "updatedAt"]),
 
   fragments: defineTable({
     messageId: v.id("messages"),
@@ -450,34 +564,11 @@ export default defineSchema({
     siteUrl: v.optional(v.string()),
   }).index("by_message", ["messageId"]),
 
-  profiles: defineTable({
-    userId: v.string(),
-    // Signs every pitch and brands the sites they send.
-    tradingName: v.string(),
-    // Experience slug — how much hand-holding the guidance gives.
-    experience: v.string(),
-    // Where they sell. Drives which businesses we look for.
-    city: v.string(),
-    // Trade slugs from ONBOARDING_INDUSTRIES.
-    industries: v.array(v.string()),
-    // Price band slug — the number the pitch anchors to.
-    priceBand: v.string(),
-    // Tone slug — the register of the generated site copy and outreach.
-    tone: v.string(),
-
-    // --- Connections. Optional: set on the connections screen after
-    // onboarding, and skippable, so every field here is nullable.
-
-    // Nango connection id for the user's Gmail account. Nango holds the
-    // OAuth tokens and refreshes them; we only keep the handle. Absent
-    // until they finish the Google consent flow.
-    gmailConnectionId: v.optional(v.string()),
-    // The Google address that was connected, shown on the connections
-    // screen so they can see which inbox pitches will send from.
-    gmailEmail: v.optional(v.string()),
-    // Stripe connected account id, once they finish Connect onboarding.
-    stripeAccountId: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
+  profiles: defineTable(profileFields)
+    .index("by_user", ["userId"])
+    // An inbound text carries the number it was sent to and nothing else,
+    // so that number is the only way back to whose account it belongs to.
+    .index("by_twilio_number", ["twilioNumber"]),
 
   feedback: defineTable({
     userId: v.string(),
